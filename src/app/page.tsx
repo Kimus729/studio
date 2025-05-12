@@ -264,22 +264,22 @@ export default function HashSwiftPage() {
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
           const objectHeaderRow = (
             <TableRow key={`${key}-header-${level}`}>
-              <TableCell 
-                className="font-semibold bg-muted/70 text-foreground" 
+              <TableCell
+                className="font-semibold bg-muted/70 text-foreground"
                 style={{ paddingLeft: `${paddingLeft}px` }}
               >
                 {key}
               </TableCell>
-              <TableCell className="bg-muted/70"></TableCell> {/* Empty cell for value column on header */}
+              <TableCell className="bg-muted/70"></TableCell>
             </TableRow>
           );
           const nestedRows = renderRows(value, level + 1);
           return [objectHeaderRow, ...nestedRows];
         }
-        
+
         return (
           <TableRow key={`${key}-${level}`}>
-            <TableCell 
+            <TableCell
               className="font-medium align-top break-words"
               style={{ paddingLeft: `${paddingLeft}px` }}
             >
