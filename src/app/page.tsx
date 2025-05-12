@@ -169,7 +169,7 @@ export default function HashSwiftPage() {
                     ))}
                   </div>
                 ) : typeof value === 'object' || Array.isArray(value) ? (
-                  JSON.stringify(value, null, 2)
+                  <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
                 ) : (
                   String(value)
                 )}
@@ -250,6 +250,75 @@ export default function HashSwiftPage() {
     } finally {
       setIsVmQueryLoading(false);
     }
+  };
+
+  const renderVmQueryResponseTable = (responseData: any) => {
+    if (!responseData || typeof responseData !== 'object' || Object.keys(responseData).length === 0) {
+      return <p className="text-muted-foreground p-4 text-center">No response data to display.</p>;
+    }
+
+    const renderRows = (data: any, level: number = 0): JSX.Element[] => {
+      return Object.entries(data).flatMap(([key, value]) => {
+        const paddingLeft = level * 20; // px for indentation
+
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          const objectHeaderRow = (
+            <TableRow key={`${key}-header-${level}`}>
+              <TableCell 
+                className="font-semibold bg-muted/70 text-foreground" 
+                style={{ paddingLeft: `${paddingLeft}px` }}
+              >
+                {key}
+              </TableCell>
+              <TableCell className="bg-muted/70"></TableCell> {/* Empty cell for value column on header */}
+            </TableRow>
+          );
+          const nestedRows = renderRows(value, level + 1);
+          return [objectHeaderRow, ...nestedRows];
+        }
+        
+        return (
+          <TableRow key={`${key}-${level}`}>
+            <TableCell 
+              className="font-medium align-top break-words"
+              style={{ paddingLeft: `${paddingLeft}px` }}
+            >
+              {key}
+            </TableCell>
+            <TableCell className="align-top break-words whitespace-pre-wrap">
+              {Array.isArray(value) ? (
+                <div className="space-y-1">
+                  {(value as any[]).map((item: any, index: number) => (
+                    <pre key={index} className="p-2 border rounded-md bg-background text-xs shadow-sm">
+                      {typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item)}
+                    </pre>
+                  ))}
+                  {value.length === 0 && <span className="text-xs text-muted-foreground">Empty array</span>}
+                </div>
+              ) : typeof value === 'object' && value !== null ? (
+                <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
+              ) : (
+                String(value)
+              )}
+            </TableCell>
+          </TableRow>
+        );
+      });
+    };
+
+    return (
+      <Table className="bg-card">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[30%] font-semibold text-foreground">Property</TableHead>
+            <TableHead className="font-semibold text-foreground">Value</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {renderRows(responseData)}
+        </TableBody>
+      </Table>
+    );
   };
 
 
@@ -531,10 +600,8 @@ export default function HashSwiftPage() {
               <Label className="text-base font-medium text-foreground">
                 VM Query Response
               </Label>
-              <ScrollArea className="h-72 w-full rounded-md border bg-muted/50 shadow-inner p-4">
-                <pre className="text-sm whitespace-pre-wrap break-all">
-                  {JSON.stringify(vmQueryResponse, null, 2)}
-                </pre>
+              <ScrollArea className="h-72 w-full rounded-md border bg-muted/50 shadow-inner">
+                {renderVmQueryResponseTable(vmQueryResponse)}
               </ScrollArea>
             </div>
           )}
@@ -551,3 +618,4 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
