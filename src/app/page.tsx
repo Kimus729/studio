@@ -139,9 +139,34 @@ export default function HashSwiftPage() {
             <TableRow key={key}>
               <TableCell className="font-medium align-top break-all">{key}</TableCell>
               <TableCell className="align-top break-all whitespace-pre-wrap">
-                {typeof value === 'object' || Array.isArray(value)
-                  ? JSON.stringify(value, null, 2)
-                  : String(value)}
+                {key === 'roles' && Array.isArray(value) ? (
+                  <div className="space-y-2">
+                    {(value as any[]).map((role: any, index: number) => (
+                      <div key={index} className="p-3 border rounded-md bg-background shadow-sm space-y-1">
+                        {role.address && (
+                          <p className="font-medium text-sm">
+                            Address: <span className="font-normal block sm:inline break-all text-muted-foreground">{role.address}</span>
+                          </p>
+                        )}
+                        <p className="font-medium text-sm pt-1">Permissions:</p>
+                        <ul className="list-disc list-inside ml-4 text-xs space-y-0.5 text-muted-foreground">
+                          {Object.entries(role)
+                            .filter(([permissionKey, permissionValue]) => permissionKey !== 'address' && typeof permissionValue === 'boolean' && permissionValue === true)
+                            .map(([permissionKey]) => (
+                              <li key={permissionKey}>{permissionKey}</li>
+                            ))}
+                          {Object.entries(role)
+                            .filter(([permissionKey, permissionValue]) => permissionKey !== 'address' && typeof permissionValue === 'boolean' && permissionValue === true)
+                            .length === 0 && <li>No specific permissions enabled.</li>}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                ) : typeof value === 'object' || Array.isArray(value) ? (
+                  JSON.stringify(value, null, 2)
+                ) : (
+                  String(value)
+                )}
               </TableCell>
             </TableRow>
           ))}
