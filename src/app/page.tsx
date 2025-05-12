@@ -10,6 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export default function HashSwiftPage() {
   // States for HashSwift (SHA-256 calculator)
@@ -111,6 +119,35 @@ export default function HashSwiftPage() {
 
   const handleFetchCollection = () => {
     fetchCollectionData(collectionNameInput);
+  };
+
+  const renderCollectionDataTable = (data: any) => {
+    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+      return <p className="text-muted-foreground p-4 text-center">No data to display for this collection.</p>;
+    }
+
+    return (
+      <Table className="bg-card">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[200px] font-semibold text-foreground">Property</TableHead>
+            <TableHead className="font-semibold text-foreground">Value</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {Object.entries(data).map(([key, value]) => (
+            <TableRow key={key}>
+              <TableCell className="font-medium align-top break-all">{key}</TableCell>
+              <TableCell className="align-top break-all whitespace-pre-wrap">
+                {typeof value === 'object' || Array.isArray(value)
+                  ? JSON.stringify(value, null, 2)
+                  : String(value)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    );
   };
 
 
@@ -276,10 +313,8 @@ export default function HashSwiftPage() {
               <Label className="text-base font-medium text-foreground">
                 Collection Data for: <span className="text-accent">{collectionData.collection || collectionNameInput}</span>
               </Label>
-              <ScrollArea className="h-72 w-full rounded-md border bg-muted/50 shadow-inner">
-                <pre className="p-4 text-xs text-muted-foreground whitespace-pre-wrap break-all font-mono">
-                  {JSON.stringify(collectionData, null, 2)}
-                </pre>
+              <ScrollArea className="h-96 w-full rounded-md border bg-muted/50 shadow-inner">
+                {renderCollectionDataTable(collectionData)}
               </ScrollArea>
             </div>
           )}
@@ -299,3 +334,4 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
