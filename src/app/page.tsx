@@ -238,7 +238,7 @@ export default function HashSwiftPage() {
         } catch (e) {
           errorData = { message: `HTTP error! status: ${response.status}. Response not in JSON format.` };
         }
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
@@ -251,73 +251,64 @@ export default function HashSwiftPage() {
       setIsVmQueryLoading(false);
     }
   };
-
-  const renderVmQueryResponseTable = (responseData: any) => {
-    if (!responseData || typeof responseData !== 'object' || Object.keys(responseData).length === 0) {
-      return <p className="text-muted-foreground p-4 text-center">No response data to display.</p>;
-    }
-
-    const renderRows = (data: any, level: number = 0): JSX.Element[] => {
-      return Object.entries(data).flatMap(([key, value]) => {
-        const paddingLeft = level * 20; // px for indentation
-
-        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-          const objectHeaderRow = (
-            <TableRow key={`${key}-header-${level}`}>
-              <TableCell
-                className="font-semibold bg-muted/70 text-foreground"
-                style={{ paddingLeft: `${paddingLeft}px` }}
-              >
-                {key}
-              </TableCell>
-              <TableCell className="bg-muted/70"></TableCell>
-            </TableRow>
-          );
-          const nestedRows = renderRows(value, level + 1);
-          return [objectHeaderRow, ...nestedRows];
+  
+  const decodeBase64 = (base64String: string): string => {
+    try {
+      const binaryString = atob(base64String);
+      // Try to interpret as UTF-8 first, as it's the most common for text
+      try {
+        return new TextDecoder('utf-8', { fatal: true }).decode(
+          Uint8Array.from(binaryString, c => c.charCodeAt(0))
+        );
+      } catch (utf8Error) {
+        // If UTF-8 decoding fails, it might be a simple number or hex string not intended as UTF-8
+        // or just plain ASCII / Latin1.
+        
+        // Check if it's a number (potentially large, so just check if it's all digits)
+        // Note: MultiversX often returns numbers as base64 encoded byte arrays.
+        // If the binary string is all digits, it might be a string representation of a number.
+        if (/^\d+$/.test(binaryString)) {
+            return binaryString; // Return as string representation of the number.
         }
 
-        return (
-          <TableRow key={`${key}-${level}`}>
-            <TableCell
-              className="font-medium align-top break-words"
-              style={{ paddingLeft: `${paddingLeft}px` }}
-            >
-              {key}
-            </TableCell>
-            <TableCell className="align-top break-words whitespace-pre-wrap">
-              {Array.isArray(value) ? (
-                <div className="space-y-1">
-                  {(value as any[]).map((item: any, index: number) => (
-                    <pre key={index} className="p-2 border rounded-md bg-background text-xs shadow-sm">
-                      {typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item)}
-                    </pre>
-                  ))}
-                  {value.length === 0 && <span className="text-xs text-muted-foreground">Empty array</span>}
-                </div>
-              ) : typeof value === 'object' && value !== null ? (
-                <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
-              ) : (
-                String(value)
-              )}
-            </TableCell>
-          </TableRow>
-        );
-      });
-    };
+        // Check if it's printable ASCII / Latin1 (common for simple strings or identifiers)
+        // and not just whitespace.
+        if (/^[\x20-\x7E]*$/.test(binaryString) && binaryString.trim() !== '') {
+          return binaryString;
+        }
+        
+        // Fallback: return hex representation of the bytes if it's not clearly text or number.
+        // This is useful for binary data that isn't text.
+        let hex = "";
+        for (let i = 0; i < binaryString.length; i++) {
+          hex += binaryString.charCodeAt(i).toString(16).padStart(2, '0');
+        }
+        return `0x${hex}`; // e.g., 0x68656c6c6f represents "hello"
+      }
+    } catch (e) {
+      // This catch is for atob failing (e.g. invalid base64 string)
+      console.error("Error in atob for base64 string:", base64String, e);
+      return "Error decoding base64 (invalid input)";
+    }
+  };
+
+  const renderVmQueryResponse = (responseData: any) => {
+    const returnDataArray = responseData?.data?.data?.returnData;
+
+    if (!Array.isArray(returnDataArray) || returnDataArray.length === 0) {
+      return <p className="text-muted-foreground p-4 text-center">No return data found or data is not in the expected array format.</p>;
+    }
 
     return (
-      <Table className="bg-card">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[30%] font-semibold text-foreground">Property</TableHead>
-            <TableHead className="font-semibold text-foreground">Value</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {renderRows(responseData)}
-        </TableBody>
-      </Table>
+      <div className="space-y-2">
+        {returnDataArray.map((base64String, index) => (
+          <div key={index} className="p-3 border rounded-md bg-background shadow-sm">
+            <p className="font-mono text-sm break-all whitespace-pre-wrap">
+              {decodeBase64(String(base64String))}
+            </p>
+          </div>
+        ))}
+      </div>
     );
   };
 
@@ -598,10 +589,10 @@ export default function HashSwiftPage() {
           {vmQueryResponse && !isVmQueryLoading && !vmQueryError && (
             <div className="space-y-3 pt-4 mt-4">
               <Label className="text-base font-medium text-foreground">
-                VM Query Response
+                VM Query Response (Decoded Return Data)
               </Label>
-              <ScrollArea className="h-72 w-full rounded-md border bg-muted/50 shadow-inner">
-                {renderVmQueryResponseTable(vmQueryResponse)}
+              <ScrollArea className="h-auto max-h-72 w-full rounded-md border bg-muted/50 shadow-inner p-3">
+                {renderVmQueryResponse(vmQueryResponse)}
               </ScrollArea>
             </div>
           )}
