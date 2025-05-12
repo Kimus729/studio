@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { UploadCloud, Loader2, Copy, AlertCircle, FileText, FileJson, Search } from "lucide-react";
+import { UploadCloud, Loader2, Copy, AlertCircle, FileText, FileJson, Search, X, Plus, Send, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,15 @@ export default function HashSwiftPage() {
   const [collectionData, setCollectionData] = React.useState<any | null>(null);
   const [isCollectionLoading, setIsCollectionLoading] = React.useState<boolean>(false);
   const [collectionError, setCollectionError] = React.useState<string | null>(null);
+
+  // States for VM Query Executor
+  const [scAddressInput, setScAddressInput] = React.useState<string>("erd1qqqqqqqqqqqqqpgqjnz905d0ltg622m8404wkar3myrmqjg2j5hq33g9q6");
+  const [funcNameInput, setFuncNameInput] = React.useState<string>("getTokenNum");
+  const [argsInputs, setArgsInputs] = React.useState<string[]>(["COLNUM01"]);
+  const [vmQueryResponse, setVmQueryResponse] = React.useState<any | null>(null);
+  const [isVmQueryLoading, setIsVmQueryLoading] = React.useState<boolean>(false);
+  const [vmQueryError, setVmQueryError] = React.useState<string | null>(null);
+
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -79,7 +88,6 @@ export default function HashSwiftPage() {
     }
   };
 
-  // Function to fetch NFT collection data
   const fetchCollectionData = async (name: string) => {
     if (!name.trim()) {
       setCollectionError("Collection name cannot be empty.");
@@ -88,7 +96,7 @@ export default function HashSwiftPage() {
     }
     setIsCollectionLoading(true);
     setCollectionError(null);
-    setCollectionData(null); // Clear previous data
+    setCollectionData(null); 
     try {
       const response = await fetch(`https://devnet-api.multiversx.com/collections/${name.trim()}`);
       if (!response.ok) {
@@ -96,7 +104,6 @@ export default function HashSwiftPage() {
         try {
           errorData = await response.json();
         } catch (e) {
-          // If error response is not JSON
           errorData = { message: `HTTP error! status: ${response.status}. Response not in JSON format.` };
         }
         throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
@@ -112,7 +119,6 @@ export default function HashSwiftPage() {
     }
   };
 
-  // Fetch initial collection data on component mount
   React.useEffect(() => {
     fetchCollectionData("COLNUM01-0e2995");
   }, []);
@@ -130,15 +136,15 @@ export default function HashSwiftPage() {
       <Table className="bg-card">
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[200px] font-semibold text-foreground">Property</TableHead>
+            <TableHead className="w-[250px] sm:w-[300px] md:w-[350px] font-semibold text-foreground">Property</TableHead>
             <TableHead className="font-semibold text-foreground">Value</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {Object.entries(data).map(([key, value]) => (
             <TableRow key={key}>
-              <TableCell className="font-medium align-top break-all">{key}</TableCell>
-              <TableCell className="align-top break-all whitespace-pre-wrap">
+              <TableCell className="font-medium align-top break-words">{key}</TableCell>
+              <TableCell className="align-top break-words whitespace-pre-wrap">
                 {key === 'roles' && Array.isArray(value) ? (
                   <div className="space-y-2">
                     {(value as any[]).map((role: any, index: number) => (
@@ -173,6 +179,77 @@ export default function HashSwiftPage() {
         </TableBody>
       </Table>
     );
+  };
+
+  // VM Query Executor functions
+  const stringToHex = (str: string): string => {
+    return str.split("").map(c => c.charCodeAt(0).toString(16).padStart(2, "0").toUpperCase()).join("");
+  };
+
+  const handleAddArgInput = () => {
+    setArgsInputs([...argsInputs, ""]);
+  };
+
+  const handleRemoveArgInput = (indexToRemove: number) => {
+    setArgsInputs(argsInputs.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleArgInputChange = (indexToChange: number, value: string) => {
+    setArgsInputs(
+      argsInputs.map((arg, index) => (index === indexToChange ? value : arg))
+    );
+  };
+
+  const handleVmQuerySubmit = async () => {
+    setIsVmQueryLoading(true);
+    setVmQueryError(null);
+    setVmQueryResponse(null);
+
+    if (!scAddressInput.trim() || !funcNameInput.trim()) {
+      setVmQueryError("SC Address and Function Name cannot be empty.");
+      setIsVmQueryLoading(false);
+      return;
+    }
+
+    try {
+      const hexEncodedArgs = argsInputs
+        .filter(arg => arg.trim() !== "")
+        .map(arg => stringToHex(arg.trim()));
+      
+      const payload = {
+        scAddress: scAddressInput.trim(),
+        funcName: funcNameInput.trim(),
+        args: hexEncodedArgs,
+      };
+
+      const response = await fetch("https://devnet-gateway.multiversx.com/vm-values/query", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { message: `HTTP error! status: ${response.status}. Response not in JSON format.` };
+        }
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setVmQueryResponse(data);
+    } catch (err: any) {
+      console.error("Error executing VM query:", err);
+      setVmQueryError(err.message || "Failed to execute VM query. Please check your inputs and try again.");
+      setVmQueryResponse(null);
+    } finally {
+      setIsVmQueryLoading(false);
+    }
   };
 
 
@@ -275,7 +352,6 @@ export default function HashSwiftPage() {
         </CardContent>
       </Card>
 
-      {/* NFT Collection Viewer Card */}
       <Card className="w-full max-w-4xl shadow-2xl rounded-xl mt-8">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-center mb-2">
@@ -351,12 +427,127 @@ export default function HashSwiftPage() {
         </CardContent>
       </Card>
 
-      <footer className="mt-8 text-center">
+      {/* VM Query Executor Card */}
+      <Card className="w-full max-w-4xl shadow-2xl rounded-xl mt-8">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-center mb-2">
+             <Terminal className="w-12 h-12 text-primary" />
+          </div>
+          <CardTitle className="text-3xl font-bold text-center text-primary tracking-tight">
+            VM Query Executor
+          </CardTitle>
+          <CardDescription className="text-center text-muted-foreground pt-1">
+            Execute smart contract queries on the MultiversX devnet.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="sc-address" className="text-base font-medium">SC Address</Label>
+              <Input
+                id="sc-address"
+                value={scAddressInput}
+                onChange={(e) => setScAddressInput(e.target.value)}
+                disabled={isVmQueryLoading}
+                className="p-3 h-11"
+                placeholder="erd1..."
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="func-name" className="text-base font-medium">Function Name</Label>
+              <Input
+                id="func-name"
+                value={funcNameInput}
+                onChange={(e) => setFuncNameInput(e.target.value)}
+                disabled={isVmQueryLoading}
+                className="p-3 h-11"
+                placeholder="e.g., getSum"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <Label className="text-base font-medium">Arguments (human-readable, will be hex-encoded)</Label>
+            {argsInputs.map((arg, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <Input
+                  type="text"
+                  value={arg}
+                  onChange={(e) => handleArgInputChange(index, e.target.value)}
+                  placeholder={`Argument ${index + 1}`}
+                  disabled={isVmQueryLoading}
+                  className="flex-grow p-3 h-11"
+                  aria-label={`Argument ${index + 1}`}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => handleRemoveArgInput(index)}
+                  disabled={isVmQueryLoading}
+                  className="h-11 w-11 flex-shrink-0 shadow-sm hover:shadow-md"
+                  aria-label={`Remove argument ${index + 1}`}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            ))}
+            <Button
+              variant="outline"
+              onClick={handleAddArgInput}
+              disabled={isVmQueryLoading}
+              className="mt-2 h-11 shadow-sm hover:shadow-md"
+            >
+              <Plus className="mr-2 h-5 w-5" /> Add Argument
+            </Button>
+          </div>
+
+          <Button 
+            onClick={handleVmQuerySubmit} 
+            disabled={isVmQueryLoading} 
+            className="w-full mt-4 h-12 text-base shadow-md hover:shadow-lg transition-shadow"
+            size="lg"
+          >
+            {isVmQueryLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
+            Execute VM Query
+          </Button>
+
+          {isVmQueryLoading && (
+            <div className="flex items-center justify-center space-x-2 text-accent p-4 rounded-md bg-accent/10 mt-4">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="text-base font-medium">Executing VM Query...</span>
+            </div>
+          )}
+
+          {vmQueryError && (
+            <Alert variant="destructive" className="shadow-md mt-4">
+              <AlertCircle className="h-5 w-5" />
+              <AlertTitle className="font-semibold">VM Query Error</AlertTitle>
+              <AlertDescription>{vmQueryError}</AlertDescription>
+            </Alert>
+          )}
+
+          {vmQueryResponse && !isVmQueryLoading && !vmQueryError && (
+            <div className="space-y-3 pt-4 mt-4">
+              <Label className="text-base font-medium text-foreground">
+                VM Query Response
+              </Label>
+              <ScrollArea className="h-72 w-full rounded-md border bg-muted/50 shadow-inner p-4">
+                <pre className="text-sm whitespace-pre-wrap break-all">
+                  {JSON.stringify(vmQueryResponse, null, 2)}
+                </pre>
+              </ScrollArea>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
+      <footer className="mt-12 text-center pb-8">
         <p className="text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} HashSwift & NFT Explorer. File hashing is done locally. NFT data from MultiversX API.
+          &copy; {new Date().getFullYear()} HashSwift, NFT Explorer & VM Query.
+          File hashing is done locally. Data fetched from MultiversX APIs.
         </p>
       </footer>
     </main>
   );
 }
-
