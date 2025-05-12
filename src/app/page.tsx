@@ -276,7 +276,7 @@ export default function HashSwiftPage() {
       </Card>
 
       {/* NFT Collection Viewer Card */}
-      <Card className="w-full max-w-lg shadow-2xl rounded-xl mt-8">
+      <Card className="w-full max-w-4xl shadow-2xl rounded-xl mt-8">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-center mb-2">
              <FileJson className="w-12 h-12 text-primary" />
