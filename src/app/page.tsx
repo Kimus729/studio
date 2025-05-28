@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { UploadCloud, Loader2, Copy, AlertCircle, FileText, FileJson, Search, X, Plus, Send, Terminal } from "lucide-react";
+import { UploadCloud, Loader2, Copy, AlertCircle, FileText, Search, X, Plus, Send, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,14 +10,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 
 export default function HashSwiftPage() {
   // States for HashSwift (SHA-256 calculator)
@@ -26,12 +18,6 @@ export default function HashSwiftPage() {
   const [isHashLoading, setIsHashLoading] = React.useState<boolean>(false);
   const [hashError, setHashError] = React.useState<string | null>(null);
   const { toast } = useToast();
-
-  // States for NFT Collection Viewer
-  const [collectionNameInput, setCollectionNameInput] = React.useState<string>("COLNUM01-0e2995");
-  const [collectionData, setCollectionData] = React.useState<any | null>(null);
-  const [isCollectionLoading, setIsCollectionLoading] = React.useState<boolean>(false);
-  const [collectionError, setCollectionError] = React.useState<string | null>(null);
 
   // States for VM Query Executor
   const [scAddressInput, setScAddressInput] = React.useState<string>("erd1qqqqqqqqqqqqqpgqjnz905d0ltg622m8404wkar3myrmqjg2j5hq33g9q6");
@@ -86,99 +72,6 @@ export default function HashSwiftPage() {
           });
         });
     }
-  };
-
-  const fetchCollectionData = async (name: string) => {
-    if (!name.trim()) {
-      setCollectionError("Collection name cannot be empty.");
-      setCollectionData(null);
-      return;
-    }
-    setIsCollectionLoading(true);
-    setCollectionError(null);
-    setCollectionData(null); 
-    try {
-      const response = await fetch(`https://devnet-api.multiversx.com/collections/${name.trim()}`);
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch (e) {
-          errorData = { message: `HTTP error! status: ${response.status}. Response not in JSON format.` };
-        }
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      setCollectionData(data);
-    } catch (err: any) {
-      console.error("Error fetching collection data:", err);
-      setCollectionError(err.message || "Failed to fetch collection data. Please check the collection name and try again.");
-      setCollectionData(null);
-    } finally {
-      setIsCollectionLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    fetchCollectionData("COLNUM01-0e2995");
-  }, []);
-
-  const handleFetchCollection = () => {
-    fetchCollectionData(collectionNameInput);
-  };
-
-  const renderCollectionDataTable = (data: any) => {
-    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
-      return <p className="text-muted-foreground p-4 text-center">No data to display for this collection.</p>;
-    }
-
-    return (
-      <Table className="bg-card">
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[250px] sm:w-[300px] md:w-[350px] font-semibold text-foreground">Property</TableHead>
-            <TableHead className="font-semibold text-foreground">Value</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {Object.entries(data).map(([key, value]) => (
-            <TableRow key={key}>
-              <TableCell className="font-medium align-top break-words">{key}</TableCell>
-              <TableCell className="align-top break-words whitespace-pre-wrap">
-                {key === 'roles' && Array.isArray(value) ? (
-                  <div className="space-y-2">
-                    {(value as any[]).map((role: any, index: number) => (
-                      <div key={index} className="p-3 border rounded-md bg-background shadow-sm space-y-1">
-                        {role.address && (
-                          <p className="font-medium text-sm">
-                            Address: <span className="font-normal block sm:inline break-all text-muted-foreground">{role.address}</span>
-                          </p>
-                        )}
-                        <p className="font-medium text-sm pt-1">Permissions:</p>
-                        <ul className="list-disc list-inside ml-4 text-xs space-y-0.5 text-muted-foreground">
-                          {Object.entries(role)
-                            .filter(([permissionKey, permissionValue]) => permissionKey !== 'address' && typeof permissionValue === 'boolean' && permissionValue === true)
-                            .map(([permissionKey]) => (
-                              <li key={permissionKey}>{permissionKey}</li>
-                            ))}
-                          {Object.entries(role)
-                            .filter(([permissionKey, permissionValue]) => permissionKey !== 'address' && typeof permissionValue === 'boolean' && permissionValue === true)
-                            .length === 0 && <li>No specific permissions enabled.</li>}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                ) : typeof value === 'object' || Array.isArray(value) ? (
-                  <pre className="text-xs">{JSON.stringify(value, null, 2)}</pre>
-                ) : (
-                  String(value)
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    );
   };
 
   // VM Query Executor functions
@@ -412,81 +305,6 @@ export default function HashSwiftPage() {
         </CardContent>
       </Card>
 
-      <Card className="w-full max-w-4xl shadow-2xl rounded-xl mt-8">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-center mb-2">
-             <FileJson className="w-12 h-12 text-primary" />
-          </div>
-          <CardTitle className="text-3xl font-bold text-center text-primary tracking-tight">
-            NFT Collection Details
-          </CardTitle>
-          <CardDescription className="text-center text-muted-foreground pt-1">
-            Enter a MultiversX NFT collection name to fetch its details.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="space-y-3">
-            <Label htmlFor="collection-name-input" className="text-base font-medium text-foreground">
-              Collection Name
-            </Label>
-            <div className="flex items-center space-x-2">
-              <Input
-                id="collection-name-input"
-                type="text"
-                value={collectionNameInput}
-                onChange={(e) => setCollectionNameInput(e.target.value)}
-                placeholder="e.g., COLNUM01-0e2995"
-                disabled={isCollectionLoading}
-                className="flex-grow p-3 h-11"
-                aria-label="NFT Collection Name Input"
-              />
-              <Button
-                onClick={handleFetchCollection}
-                disabled={isCollectionLoading}
-                variant="default"
-                size="default"
-                className="h-11 shadow-sm hover:shadow-md transition-shadow"
-                aria-label="Fetch collection data"
-              >
-                {isCollectionLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
-                <span className={isCollectionLoading ? "sr-only" : "ml-2"}>Fetch</span>
-              </Button>
-            </div>
-          </div>
-
-          {isCollectionLoading && (
-            <div className="flex items-center justify-center space-x-2 text-accent p-4 rounded-md bg-accent/10">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="text-base font-medium">Fetching collection data...</span>
-            </div>
-          )}
-
-          {collectionError && (
-            <Alert variant="destructive" className="shadow-md">
-              <AlertCircle className="h-5 w-5" />
-              <AlertTitle className="font-semibold">Error Fetching Collection</AlertTitle>
-              <AlertDescription>{collectionError}</AlertDescription>
-            </Alert>
-          )}
-
-          {collectionData && !isCollectionLoading && !collectionError && (
-            <div className="space-y-3 pt-2">
-              <Label className="text-base font-medium text-foreground">
-                Collection Data for: <span className="text-accent">{collectionData.collection || collectionNameInput}</span>
-              </Label>
-              <ScrollArea className="h-96 w-full rounded-md border bg-muted/50 shadow-inner">
-                {renderCollectionDataTable(collectionData)}
-              </ScrollArea>
-            </div>
-          )}
-           {!collectionData && !isCollectionLoading && !collectionError && (
-            <div className="text-center text-muted-foreground p-4">
-              <p>No data to display. Fetch a collection to see its details.</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* VM Query Executor Card */}
       <Card className="w-full max-w-4xl shadow-2xl rounded-xl mt-8">
         <CardHeader className="pb-4">
@@ -602,11 +420,10 @@ export default function HashSwiftPage() {
 
       <footer className="mt-12 text-center pb-8">
         <p className="text-sm text-muted-foreground">
-          &copy; {new Date().getFullYear()} HashSwift, NFT Explorer & VM Query.
+          &copy; {new Date().getFullYear()} HashSwift & VM Query.
           File hashing is done locally. Data fetched from MultiversX APIs.
         </p>
       </footer>
     </main>
   );
 }
-
