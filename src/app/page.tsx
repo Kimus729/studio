@@ -141,8 +141,6 @@ export default function HashSwiftPage() {
     }
   };
   
-  // This function is kept for potential future use or selective decoding needs.
-  // It is not actively used by renderVmQueryResponse when displaying the full JSON.
   const decodeBase64 = (base64String: string): string => {
     try {
       const binaryString = atob(base64String);
@@ -392,7 +390,10 @@ export default function HashSwiftPage() {
               <Label className="text-base font-medium text-foreground">
                 VM Query Response (Full JSON)
               </Label>
-              <ScrollArea className="h-auto max-h-[32rem] w-full rounded-md border bg-muted/50 shadow-inner p-3">
+              <ScrollArea 
+                type="always" 
+                className="h-auto max-h-[24rem] w-full rounded-md border bg-muted/50 shadow-inner p-3"
+              >
                 {renderVmQueryResponse(vmQueryResponse)}
               </ScrollArea>
             </div>
