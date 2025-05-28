@@ -108,7 +108,7 @@ export default function HashSwiftPage() {
       const payload = {
         scAddress: scAddressInput.trim(),
         funcName: funcNameInput.trim(),
-        args: processedArgs, // Arguments are no longer hex-encoded
+        args: processedArgs,
       };
 
       const response = await fetch("https://devnet-gateway.multiversx.com/vm-values/query", {
@@ -141,63 +141,45 @@ export default function HashSwiftPage() {
     }
   };
   
+  // This function is kept for potential future use or selective decoding needs.
+  // It is not actively used by renderVmQueryResponse when displaying the full JSON.
   const decodeBase64 = (base64String: string): string => {
     try {
       const binaryString = atob(base64String);
-      // Try to interpret as UTF-8 first, as it's the most common for text
       try {
         return new TextDecoder('utf-8', { fatal: true }).decode(
           Uint8Array.from(binaryString, c => c.charCodeAt(0))
         );
       } catch (utf8Error) {
-        // If UTF-8 decoding fails, it might be a simple number or hex string not intended as UTF-8
-        // or just plain ASCII / Latin1.
-        
-        // Check if it's a number (potentially large, so just check if it's all digits)
-        // Note: MultiversX often returns numbers as base64 encoded byte arrays.
-        // If the binary string is all digits, it might be a string representation of a number.
         if (/^\d+$/.test(binaryString)) {
-            return binaryString; // Return as string representation of the number.
+            return binaryString; 
         }
-
-        // Check if it's printable ASCII / Latin1 (common for simple strings or identifiers)
-        // and not just whitespace.
         if (/^[\x20-\x7E]*$/.test(binaryString) && binaryString.trim() !== '') {
           return binaryString;
         }
-        
-        // Fallback: return hex representation of the bytes if it's not clearly text or number.
-        // This is useful for binary data that isn't text.
         let hex = "";
         for (let i = 0; i < binaryString.length; i++) {
           hex += binaryString.charCodeAt(i).toString(16).padStart(2, '0');
         }
-        return `0x${hex}`; // e.g., 0x68656c6c6f represents "hello"
+        return `0x${hex}`; 
       }
     } catch (e) {
-      // This catch is for atob failing (e.g. invalid base64 string)
       console.error("Error in atob for base64 string:", base64String, e);
       return "Error decoding base64 (invalid input)";
     }
   };
 
   const renderVmQueryResponse = (responseData: any) => {
-    const returnDataArray = responseData?.data?.data?.returnData;
-
-    if (!Array.isArray(returnDataArray) || returnDataArray.length === 0) {
-      return <p className="text-muted-foreground p-4 text-center">No return data found or data is not in the expected array format.</p>;
+    // Check if responseData is an empty object
+    if (typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
+      return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
     }
-
+    
+    // Pretty-print the entire JSON object
     return (
-      <div className="space-y-2">
-        {returnDataArray.map((base64String, index) => (
-          <div key={index} className="p-3 border rounded-md bg-background shadow-sm">
-            <p className="font-mono text-sm break-all whitespace-pre-wrap">
-              {decodeBase64(String(base64String))}
-            </p>
-          </div>
-        ))}
-      </div>
+      <pre className="font-mono text-sm break-all whitespace-pre-wrap">
+        {JSON.stringify(responseData, null, 2)}
+      </pre>
     );
   };
 
@@ -403,9 +385,9 @@ export default function HashSwiftPage() {
           {vmQueryResponse && !isVmQueryLoading && !vmQueryError && (
             <div className="space-y-3 pt-4 mt-4">
               <Label className="text-base font-medium text-foreground">
-                VM Query Response (Decoded Return Data)
+                VM Query Response (Full JSON)
               </Label>
-              <ScrollArea className="h-auto max-h-72 w-full rounded-md border bg-muted/50 shadow-inner p-3">
+              <ScrollArea className="h-auto max-h-96 w-full rounded-md border bg-muted/50 shadow-inner p-3">
                 {renderVmQueryResponse(vmQueryResponse)}
               </ScrollArea>
             </div>
@@ -423,4 +405,3 @@ export default function HashSwiftPage() {
     </main>
   );
 }
-
