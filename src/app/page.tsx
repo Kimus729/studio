@@ -157,7 +157,7 @@ export default function HashSwiftPage() {
       // The hashHex is already hex. Other user-typed args should also be hex if required.
       const processedArgs = currentArgs
         .filter(arg => arg.trim() !== "")
-        .map(arg => arg.trim()); // No more stringToHex here
+        .map(arg => arg.trim()); 
       
       const payload = {
         scAddress: scAddressInput.trim(),
@@ -253,33 +253,51 @@ export default function HashSwiftPage() {
   };
 
   const renderVmQueryResponse = (responseData: any) => {
-    const returnData = responseData?.data?.data?.returnData;
+    const firstArg = argsInputs.length > 0 ? argsInputs[0] : "la valeur de hachage fournie";
+    const customNoRecordMessage = `Pas d'enregistrement pour ${firstArg}.`;
 
     if (!responseData || typeof responseData !== 'object' || Object.keys(responseData).length === 0) {
-      return <p className="text-muted-foreground p-4 text-center">No response data.</p>;
+      return <p className="text-muted-foreground p-4 text-center">Aucune donnée de réponse.</p>;
     }
     
-    if (!returnData || !Array.isArray(returnData) || returnData.length === 0) {
-      if (responseData?.data?.data && (!returnData || returnData.length === 0)) {
-         return (
+    const dataBlock = responseData?.data?.data;
+    const returnDataArray = dataBlock?.returnData;
+
+    // Case 1: 'returnData' is an empty array.
+    if (Array.isArray(returnDataArray) && returnDataArray.length === 0) {
+        return (
+            <p className="text-muted-foreground p-4 text-center">{customNoRecordMessage}</p>
+        );
+    }
+    
+    // Case 2 & 3: 'returnData' is missing, null, or not an array.
+    if (!returnDataArray || !Array.isArray(returnDataArray)) {
+        let detailMessage = "";
+        if (dataBlock && typeof dataBlock === 'object' && 'returnData' in dataBlock) {
+            detailMessage = "La clé 'returnData' est présente mais sa valeur est nulle ou son format est inattendu (devrait être un tableau).";
+        } else if (dataBlock && typeof dataBlock === 'object') {
+            detailMessage = "La clé 'returnData' est absente de la section 'data.data'.";
+        } else {
+            detailMessage = "La structure de la réponse est inattendue ('data.data' ou 'returnData' manquants).";
+        }
+
+        return (
             <>
-                <p className="text-muted-foreground p-4 text-center">No 'returnData' found or it's empty. Displaying full response:</p>
-                <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>
+                <p className="text-muted-foreground p-4 text-center">
+                    {customNoRecordMessage} <br /> {detailMessage} Affichage de la réponse complète :
+                </p>
+                <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">
+                    {JSON.stringify(responseData, null, 2)}
+                </pre>
             </>
-         );
-      }
-      return (
-        <>
-            <p className="text-muted-foreground p-4 text-center">No 'returnData' found. Displaying full response:</p>
-            <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>
-        </>
-      );
+        );
     }
     
+    // If we reach here, returnDataArray is a non-empty array. Proceed with chunking.
     const CHUNK_SIZE = 7;
     const potentialChunks = [];
-    for (let i = 0; i < returnData.length; i += CHUNK_SIZE) {
-      potentialChunks.push(returnData.slice(i, i + CHUNK_SIZE));
+    for (let i = 0; i < returnDataArray.length; i += CHUNK_SIZE) {
+      potentialChunks.push(returnDataArray.slice(i, i + CHUNK_SIZE));
     }
 
     const displayableChunks = potentialChunks.filter(chunk => chunk.length > 1);
@@ -287,7 +305,7 @@ export default function HashSwiftPage() {
     if (displayableChunks.length === 0) {
        return (
         <>
-            <p className="text-muted-foreground p-4 text-center">'returnData' exists but no displayable groups. Displaying full response:</p>
+            <p className="text-muted-foreground p-4 text-center">'returnData' existe mais aucun groupe affichable (moins de 2 éléments par groupe potentiel). Affichage de la réponse complète :</p>
             <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>
         </>
       );
