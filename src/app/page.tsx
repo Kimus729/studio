@@ -141,45 +141,47 @@ export default function HashSwiftPage() {
     }
   };
   
-  const decodeBase64 = (base64String: string): string => {
-    if (!base64String) return ""; // Handle empty or null strings
+  const decodeBase64 = (base64String: string, decodeAs: 'string' | 'number' = 'string'): string => {
+    if (base64String === null || base64String === undefined) {
+      return decodeAs === 'number' ? "Error: Input is null/undefined" : "";
+    }
+    if (base64String === "") {
+      return decodeAs === 'number' ? "0" : ""; 
+    }
+
     try {
-      // Check if the string is already decoded or not valid base64
-      // A more robust check for base64:
-      const isBase64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64String);
+      const binaryString = atob(base64String); 
+      const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
 
-      if (!isBase64) {
-         // If it doesn't look like base64, return as is (might be already decoded or other format)
-        return base64String;
-      }
-
-      const binaryString = atob(base64String);
-      // Attempt to decode as UTF-8
-      try {
-        return new TextDecoder('utf-8', { fatal: true }).decode(
-          Uint8Array.from(binaryString, c => c.charCodeAt(0))
-        );
-      } catch (utf8Error) {
-        // If UTF-8 fails, it might be raw binary data not intended as text.
-        // Convert to hex for a readable representation.
-        let hex = "0x";
-        for (let i = 0; i < binaryString.length; i++) {
-          hex += binaryString.charCodeAt(i).toString(16).padStart(2, '0');
+      if (decodeAs === 'number') {
+        if (bytes.length === 0) {
+          return "0"; 
         }
-        // If the hex string is very short (e.g. just "0x" or "0x00"), 
-        // it might represent a small number. Try to parse it.
-        if (hex.length <= 6 && /^0x[0-9a-fA-F]+$/.test(hex)) {
-            const num = parseInt(hex, 16);
-            if (!isNaN(num) && num.toString(16).padStart(hex.length-2,'0') === hex.substring(2)) { // check if conversion is precise
-                return num.toString();
-            }
+        let result = 0n;
+        for (let i = 0; i < bytes.length; i++) {
+          result = (result << 8n) + BigInt(bytes[i]);
         }
-        return hex; // Default to hex for non-UTF8 binary data
+        return result.toString();
+      } else { // decodeAs === 'string'
+        if (bytes.length === 0) {
+          return ""; 
+        }
+        try {
+          return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+        } catch (utf8Error) {
+          let hex = "0x";
+          for (let i = 0; i < bytes.length; i++) {
+            hex += bytes[i].toString(16).padStart(2, '0');
+          }
+          return hex;
+        }
       }
-    } catch (e) {
-      // This catch is for `atob` if the base64 string itself is invalid or other errors during decoding
-      console.warn("Could not decode base64 string, returning as is:", base64String, e);
-      return base64String; // Return original string if any decoding step fails
+    } catch (e: any) { 
+      console.warn(`Error decoding base64 string "${base64String}" as ${decodeAs}: ${e.message}`);
+      if (decodeAs === 'number') {
+        return `Error: Not a valid Base64-encoded number ("${base64String}")`;
+      }
+      return base64String;
     }
   };
 
@@ -187,11 +189,9 @@ export default function HashSwiftPage() {
     const returnData = responseData?.data?.data?.returnData;
 
     if (!returnData || !Array.isArray(returnData) || returnData.length === 0) {
-      // Check if the entire response is an empty object
       if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
         return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
       }
-      // Check if 'data.data' exists but 'returnData' is missing or empty
       if (responseData?.data?.data && (!returnData || returnData.length === 0)) {
          return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
       }
@@ -205,18 +205,27 @@ export default function HashSwiftPage() {
     }
 
     return (
-      <div className="space-y-4"> {/* Main container for all groups */}
+      <div className="space-y-4">
         {chunks.map((chunk, groupIndex) => (
-          <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md"> {/* Group container */}
-            <div className="space-y-2"> {/* Container for items within a group */}
-              {chunk.map((item: string, itemIndex: number) => (
-                <div 
-                  key={`item-${groupIndex}-${itemIndex}`} 
-                  className="p-3 border rounded-md bg-background font-mono text-sm break-all shadow-sm" // Individual item style
-                >
-                  {decodeBase64(item)}
-                </div>
-              ))}
+          <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md">
+            <div className="space-y-2">
+              {chunk.map((item: string, itemIndex: number) => {
+                let decodedItem;
+                // Le premier (index 0), le troisième (index 2), et le septième (index 6) de chaque chunk
+                if (itemIndex === 0 || itemIndex === 2 || itemIndex === 6) {
+                  decodedItem = decodeBase64(item, 'number');
+                } else {
+                  decodedItem = decodeBase64(item, 'string');
+                }
+                return (
+                  <div 
+                    key={`item-${groupIndex}-${itemIndex}`} 
+                    className="p-3 border rounded-md bg-background font-mono text-sm break-all shadow-sm"
+                  >
+                    {decodedItem}
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -449,3 +458,5 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
+    
