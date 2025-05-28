@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { UploadCloud, Loader2, Copy, AlertCircle, FileText, Search, X, Plus, Send, Terminal } from "lucide-react";
+import { UploadCloud, Loader2, Copy, AlertCircle, FileText, Search, X, Plus, Send, Terminal, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ export default function HashSwiftPage() {
   const [vmQueryResponse, setVmQueryResponse] = React.useState<any | null>(null);
   const [isVmQueryLoading, setIsVmQueryLoading] = React.useState<boolean>(false);
   const [vmQueryError, setVmQueryError] = React.useState<string | null>(null);
+  const [openGroups, setOpenGroups] = React.useState<Record<number, boolean>>({});
 
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -93,6 +94,7 @@ export default function HashSwiftPage() {
     setIsVmQueryLoading(true);
     setVmQueryError(null);
     setVmQueryResponse(null);
+    setOpenGroups({}); // Reset open groups on new query
 
     if (!scAddressInput.trim() || !funcNameInput.trim()) {
       setVmQueryError("SC Address and Function Name cannot be empty.");
@@ -181,8 +183,12 @@ export default function HashSwiftPage() {
       if (decodeAs === 'number') {
         return `Error: Not a valid Base64-encoded number ("${base64String}")`;
       }
-      return base64String;
+      return base64String; // Return original string if string decoding fails, helps in debugging
     }
+  };
+
+  const toggleGroup = (groupIndex: number) => {
+    setOpenGroups(prev => ({ ...prev, [groupIndex]: !prev[groupIndex] }));
   };
 
   const renderVmQueryResponse = (responseData: any) => {
@@ -192,6 +198,7 @@ export default function HashSwiftPage() {
       if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
         return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
       }
+      // If returnData exists in structure but is empty array, show full response
       if (responseData?.data?.data && (!returnData || returnData.length === 0)) {
          return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
       }
@@ -199,57 +206,90 @@ export default function HashSwiftPage() {
     }
     
     const CHUNK_SIZE = 7;
-    const chunks = [];
+    const potentialChunks = [];
     for (let i = 0; i < returnData.length; i += CHUNK_SIZE) {
-      chunks.push(returnData.slice(i, i + CHUNK_SIZE));
+      potentialChunks.push(returnData.slice(i, i + CHUNK_SIZE));
+    }
+
+    const displayableChunks = potentialChunks.filter(chunk => chunk.length > 1);
+
+    if (displayableChunks.length === 0) {
+      // If returnData was not empty, but no chunks are suitable for accordion display, show full response
+      return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
     }
 
     return (
       <div className="space-y-4">
-        {chunks.map((chunk, groupIndex) => (
-          <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md">
-            <div className="space-y-1"> {/* Reduced space-y from 2 to 1 */}
-              {chunk.map((item: string, itemIndex: number) => {
-                let decodedItemDisplay;
-                
-                if (itemIndex === 0) { // Premier élément du chunk
-                  return null; // Ne pas afficher le premier champ
-                } else if (itemIndex === 2) { // Troisième élément du chunk
-                  decodedItemDisplay = decodeBase64(item, 'number');
-                } else if (itemIndex === 6) { // Septième élément du chunk
-                  const decodedNumberString = decodeBase64(item, 'number');
-                  if (decodedNumberString.startsWith("Error:")) {
-                    decodedItemDisplay = `Error converting to date: ${decodedNumberString}`;
-                  } else {
-                    try {
-                      const timestamp = parseInt(decodedNumberString, 10);
-                      if (isNaN(timestamp)) {
-                        decodedItemDisplay = `Error: Decoded value for date is not a number ("${decodedNumberString}")`;
-                      } else {
-                        const dateObject = new Date(timestamp * 1000); // Timestamp Unix est en secondes
-                        decodedItemDisplay = dateObject.toLocaleString(); // Date et heure locales
-                      }
-                    } catch (e: any) {
-                      decodedItemDisplay = `Error parsing/converting date: ${e.message}`;
-                    }
-                  }
-                } else { // Autres éléments
-                  decodedItemDisplay = decodeBase64(item, 'string');
-                }
+        {displayableChunks.map((chunk, groupIndex) => {
+          const isGroupOpen = !!openGroups[groupIndex];
+          // chunk[0] is skipped. chunk[1] (if exists) is the first displayed item and toggle header.
+          const toggleHeaderContent = decodeBase64(chunk[1], 'string');
 
-                return (
-                  <div 
-                    key={`item-${groupIndex}-${itemIndex}`} 
-                    // Reduced padding from p-3 to p-2, text-sm to text-xs, and removed shadow-sm
-                    className="p-2 border rounded-md bg-background font-mono text-xs break-all" 
-                  >
-                    {decodedItemDisplay}
-                  </div>
-                );
-              })}
+          return (
+            <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md">
+              <div
+                className="flex items-center justify-between p-2 border rounded-md bg-background font-mono text-sm break-all cursor-pointer hover:bg-muted/50"
+                onClick={() => toggleGroup(groupIndex)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleGroup(groupIndex); }}
+                aria-expanded={isGroupOpen}
+                aria-controls={`group-content-${groupIndex}`}
+              >
+                <span className="truncate">{toggleHeaderContent}</span>
+                {isGroupOpen ? <ChevronUp className="h-5 w-5 flex-shrink-0 ml-2" /> : <ChevronDown className="h-5 w-5 flex-shrink-0 ml-2" />}
+              </div>
+
+              {isGroupOpen && (
+                <div id={`group-content-${groupIndex}`} className="space-y-1 mt-2">
+                  {chunk.map((item: string, itemIndex: number) => {
+                    // itemIndex is the original index in the chunk (0-6)
+                    // We display items from original index 2 up to 6 here.
+                    // chunk[0] is never displayed.
+                    // chunk[1] is the toggle header, so also skipped here.
+                    if (itemIndex < 2) { 
+                      return null;
+                    }
+
+                    let decodedItemDisplay;
+                    
+                    if (itemIndex === 2) { // Original third item in chunk
+                      decodedItemDisplay = decodeBase64(item, 'number');
+                    } else if (itemIndex === 6) { // Original seventh item in chunk
+                      const decodedNumberString = decodeBase64(item, 'number');
+                      if (decodedNumberString.startsWith("Error:")) {
+                        decodedItemDisplay = `Error converting to date: ${decodedNumberString}`;
+                      } else {
+                        try {
+                          const timestamp = parseInt(decodedNumberString, 10);
+                          if (isNaN(timestamp)) {
+                            decodedItemDisplay = `Error: Decoded value for date is not a number ("${decodedNumberString}")`;
+                          } else {
+                            const dateObject = new Date(timestamp * 1000); // Unix timestamp is in seconds
+                            decodedItemDisplay = dateObject.toLocaleString(); // Local date and time
+                          }
+                        } catch (e: any) {
+                          decodedItemDisplay = `Error parsing/converting date: ${e.message}`;
+                        }
+                      }
+                    } else { // Other items (original indices 3, 4, 5 in chunk)
+                      decodedItemDisplay = decodeBase64(item, 'string');
+                    }
+
+                    return (
+                      <div 
+                        key={`item-${groupIndex}-${itemIndex}`} 
+                        className="p-2 border rounded-md bg-background font-mono text-xs break-all" 
+                      >
+                        {decodedItemDisplay}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     );
   };
@@ -479,9 +519,3 @@ export default function HashSwiftPage() {
     </main>
   );
 }
-
-    
-
-    
-
-    
