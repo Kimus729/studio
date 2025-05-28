@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { cn } from "@/lib/utils";
 
 export default function HashSwiftPage() {
   // States for HashSwift (SHA-256 calculator)
@@ -17,6 +18,7 @@ export default function HashSwiftPage() {
   const [fileHash, setFileHash] = React.useState<string | null>(null);
   const [isHashLoading, setIsHashLoading] = React.useState<boolean>(false);
   const [hashError, setHashError] = React.useState<string | null>(null);
+  const [isDraggingOver, setIsDraggingOver] = React.useState<boolean>(false);
   const { toast } = useToast();
 
   // States for VM Query Executor
@@ -28,16 +30,14 @@ export default function HashSwiftPage() {
   const [vmQueryError, setVmQueryError] = React.useState<string | null>(null);
   const [openGroups, setOpenGroups] = React.useState<Record<number, boolean>>({});
 
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+  const processFile = async (fileToProcess: File | null) => {
+    if (fileToProcess) {
+      setSelectedFile(fileToProcess);
       setHashError(null);
-      setFileHash(null);
+      setFileHash(null); // Reset previous hash
       setIsHashLoading(true);
       try {
-        const arrayBuffer = await file.arrayBuffer();
+        const arrayBuffer = await fileToProcess.arrayBuffer();
         const hashBuffer = await crypto.subtle.digest("SHA-256", arrayBuffer);
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -52,6 +52,49 @@ export default function HashSwiftPage() {
     } else {
       setSelectedFile(null);
       setFileHash(null);
+    }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    processFile(file || null);
+  };
+
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isHashLoading) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!isHashLoading && !isDraggingOver) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Check if the mouse is leaving the actual drop zone and not just moving over a child element.
+    if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+      setIsDraggingOver(false);
+    }
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsDraggingOver(false);
+    if (isHashLoading) {
+      return;
+    }
+    const droppedFiles = event.dataTransfer.files;
+    if (droppedFiles && droppedFiles.length > 0) {
+      processFile(droppedFiles[0]);
     }
   };
 
@@ -183,9 +226,7 @@ export default function HashSwiftPage() {
       if (decodeAs === 'number') {
         return `Error: Not a valid Base64-encoded number ("${base64String}")`;
       }
-      // For string decoding, if atob fails (e.g. not valid base64), return the original string.
-      // This helps in debugging if the input wasn't base64 to begin with.
-      if (e.name === 'InvalidCharacterError') { // DOMException for atob
+      if (e.name === 'InvalidCharacterError') { 
          return base64String;
       }
       return `Error decoding as string: ${e.message}`;
@@ -302,7 +343,7 @@ export default function HashSwiftPage() {
                       decodedItemDisplay = rawDecodedValue;
                       if ((itemIndex === 4 || itemIndex === 5) && typeof decodedItemDisplay === 'string' && decodedItemDisplay.startsWith('0x')) {
                         decodedItemDisplay = decodedItemDisplay.substring(2);
-                        if (itemIndex === 5) rawDecodedValue = decodedItemDisplay; // Update rawDecodedValue for transaction link
+                        if (itemIndex === 5) rawDecodedValue = decodedItemDisplay; 
                       }
                     }
 
@@ -319,7 +360,6 @@ export default function HashSwiftPage() {
                           </a>
                         );
                     }
-
 
                     return (
                       <div 
@@ -365,16 +405,27 @@ export default function HashSwiftPage() {
               Upload File
             </Label>
             <div
-              className={`flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted transition-colors
-                ${isHashLoading ? "opacity-60 cursor-not-allowed" : "hover:border-accent focus-within:border-accent"}
-                ${hashError ? "border-destructive" : "border-border"}`}
+              className={cn(
+                "flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted transition-colors",
+                isHashLoading 
+                  ? "opacity-60 cursor-not-allowed"
+                  : isDraggingOver 
+                    ? "border-accent ring-2 ring-offset-2 ring-accent shadow-lg" 
+                    : hashError 
+                      ? "border-destructive" 
+                      : "border-border hover:border-accent focus-within:border-accent"
+              )}
               onClick={() => !isHashLoading && document.getElementById('file-upload')?.click()}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') !isHashLoading && document.getElementById('file-upload')?.click()}}
               tabIndex={isHashLoading ? -1 : 0}
               role="button"
               aria-label="File upload area"
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
-              <UploadCloud className={`w-12 h-12 mb-3 ${hashError ? 'text-destructive' : 'text-accent'}`} />
+              <UploadCloud className={`w-12 h-12 mb-3 ${isDraggingOver ? 'text-accent' : (hashError ? 'text-destructive' : 'text-accent')}`} />
               <p className="mb-2 text-base text-foreground">
                 <span className="font-semibold">Click to upload</span> or drag and drop
               </p>
@@ -554,7 +605,6 @@ export default function HashSwiftPage() {
           )}
         </CardContent>
       </Card>
-
 
       <footer className="mt-12 text-center pb-8">
         <p className="text-sm text-muted-foreground">
