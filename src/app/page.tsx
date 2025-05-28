@@ -408,7 +408,7 @@ export default function HashSwiftPage() {
               </Label>
               <ScrollArea 
                 type="always" 
-                className="h-auto max-h-[32rem] w-full rounded-md border bg-muted/50 shadow-inner p-3"
+                className="h-auto max-h-[40rem] w-full rounded-md border bg-muted/50 shadow-inner p-3"
               >
                 {renderVmQueryResponse(vmQueryResponse)}
               </ScrollArea>
@@ -427,3 +427,4 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
