@@ -20,9 +20,9 @@ export default function HashSwiftPage() {
   const { toast } = useToast();
 
   // States for VM Query Executor
-  const [scAddressInput, setScAddressInput] = React.useState<string>("erd1qqqqqqqqqqqqqpgqjnz905d0ltg622m8404wkar3myrmqjg2j5hq33g9q6");
-  const [funcNameInput, setFuncNameInput] = React.useState<string>("getTokenNum");
-  const [argsInputs, setArgsInputs] = React.useState<string[]>(["COLNUM01"]);
+  const [scAddressInput, setScAddressInput] = React.useState<string>("erd1qqqqqqqqqqqqqpgqkd7q05rf5l8q74dhv8hx0atkuf7lxpad0qes8h26jv");
+  const [funcNameInput, setFuncNameInput] = React.useState<string>("getPrintInfoFromHash");
+  const [argsInputs, setArgsInputs] = React.useState<string[]>(["3486f3dda9ffec7a8e416e00c2634f02e798dab3cf728cf5214bc8f7e4ca69a5"]);
   const [vmQueryResponse, setVmQueryResponse] = React.useState<any | null>(null);
   const [isVmQueryLoading, setIsVmQueryLoading] = React.useState<boolean>(false);
   const [vmQueryError, setVmQueryError] = React.useState<string | null>(null);
@@ -147,23 +147,28 @@ export default function HashSwiftPage() {
     try {
       const binaryString = atob(base64String);
       try {
+        // Attempt to decode as UTF-8
         return new TextDecoder('utf-8', { fatal: true }).decode(
           Uint8Array.from(binaryString, c => c.charCodeAt(0))
         );
       } catch (utf8Error) {
+        // If UTF-8 fails, check if it's a simple number string
         if (/^\d+$/.test(binaryString)) {
-            return binaryString; 
+            return binaryString; // Return as is if it's a number
         }
+        // If not a number, check if it's printable ASCII (and not just whitespace)
         if (/^[\x20-\x7E]*$/.test(binaryString) && binaryString.trim() !== '') {
-          return binaryString;
+          return binaryString; // Return as is if printable ASCII
         }
+        // Fallback: convert to hex if it's not clearly text or number
         let hex = "";
         for (let i = 0; i < binaryString.length; i++) {
           hex += binaryString.charCodeAt(i).toString(16).padStart(2, '0');
         }
-        return `0x${hex}`; 
+        return `0x${hex}`; // Prefix with 0x to indicate hex
       }
     } catch (e) {
+      // This catch is for `atob` if the base64 string itself is invalid
       console.error("Error in atob for base64 string:", base64String, e);
       return "Error decoding base64 (invalid input)";
     }
@@ -171,7 +176,7 @@ export default function HashSwiftPage() {
 
   const renderVmQueryResponse = (responseData: any) => {
     // Check if responseData is an empty object
-    if (typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
+    if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
       return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
     }
     
@@ -387,7 +392,7 @@ export default function HashSwiftPage() {
               <Label className="text-base font-medium text-foreground">
                 VM Query Response (Full JSON)
               </Label>
-              <ScrollArea className="h-auto max-h-96 w-full rounded-md border bg-muted/50 shadow-inner p-3">
+              <ScrollArea className="h-auto max-h-[28rem] w-full rounded-md border bg-muted/50 shadow-inner p-3">
                 {renderVmQueryResponse(vmQueryResponse)}
               </ScrollArea>
             </div>
@@ -405,3 +410,4 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
