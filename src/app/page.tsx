@@ -183,7 +183,12 @@ export default function HashSwiftPage() {
       if (decodeAs === 'number') {
         return `Error: Not a valid Base64-encoded number ("${base64String}")`;
       }
-      return base64String; // Return original string if string decoding fails, helps in debugging
+      // For string decoding, if atob fails (e.g. not valid base64), return the original string.
+      // This helps in debugging if the input wasn't base64 to begin with.
+      if (e.name === 'InvalidCharacterError') { // DOMException for atob
+         return base64String;
+      }
+      return `Error decoding as string: ${e.message}`;
     }
   };
 
@@ -210,15 +215,25 @@ export default function HashSwiftPage() {
       potentialChunks.push(returnData.slice(i, i + CHUNK_SIZE));
     }
 
+    // We only want to display chunks that have more than the header (chunk[1])
+    // because chunk[0] is hidden and chunk[1] is the header.
+    // So, effectively, chunks with length > 1 could be displayable if they meet the criteria.
+    // However, since we process based on CHUNK_SIZE = 7, we expect full chunks or a partial last one.
+    // The user's request implies that the structure of 7 elements per meaningful group is expected.
     const displayableChunks = potentialChunks.filter(chunk => chunk.length > 1);
 
+
     if (displayableChunks.length === 0) {
+      // If no chunks are displayable (e.g., returnData was [""], [null, "abc"])
+      // show the full JSON response as a fallback.
       return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
     }
 
     return (
       <div className="space-y-4">
         {displayableChunks.map((chunk, groupIndex) => {
+          if (chunk.length < 2) return null; // Should not happen due to filter, but good practice
+
           const isGroupOpen = !!openGroups[groupIndex];
           const toggleHeaderContent = decodeBase64(chunk[1], 'string'); // chunk[1] is the header
 
@@ -240,9 +255,15 @@ export default function HashSwiftPage() {
               {isGroupOpen && (
                 <div id={`group-content-${groupIndex}`} className="space-y-1 mt-2">
                   {chunk.map((item: string, itemIndex: number) => {
-                    if (itemIndex < 2) { // chunk[0] is skipped, chunk[1] is the header
+                    // Skip chunk[0] (always hidden) and chunk[1] (used as header) for individual display
+                    if (itemIndex < 2) { 
                       return null;
                     }
+                    // Ensure we don't try to process fields if the chunk is too short for them
+                    if (itemIndex >= chunk.length) {
+                        return null;
+                    }
+
 
                     const fieldLabels = [
                       "Nonce",              // Corresponds to chunk[2] (itemIndex 2)
@@ -251,9 +272,19 @@ export default function HashSwiftPage() {
                       "Transaction",        // Corresponds to chunk[5] (itemIndex 5)
                       "Date/Heure Enregistrement" // Corresponds to chunk[6] (itemIndex 6)
                     ];
+                    
                     // The label index will be itemIndex - 2 because we skip the first two items of the chunk
                     // (chunk[0] and chunk[1] which is the header) for display under the header.
-                    const label = fieldLabels[itemIndex - 2];
+                    const labelIndex = itemIndex - 2;
+                    if (labelIndex < 0 || labelIndex >= fieldLabels.length) {
+                        // This case should ideally not be reached if chunk structure is consistent
+                        return (
+                            <div key={`item-${groupIndex}-${itemIndex}-error`} className="p-2 font-mono text-xs text-destructive break-all">
+                                Error: Label not found for item index {itemIndex}.
+                            </div>
+                        );
+                    }
+                    const label = fieldLabels[labelIndex];
 
                     let decodedItemDisplay;
                     
@@ -278,6 +309,11 @@ export default function HashSwiftPage() {
                       }
                     } else { // Other items (original indices 3, 4, 5 in chunk: Nom, Hash, Transaction)
                       decodedItemDisplay = decodeBase64(item, 'string');
+                      // itemIndex 4 is "Hash du fichier" (3rd field under label)
+                      // itemIndex 5 is "Transaction" (4th field under label)
+                      if ((itemIndex === 4 || itemIndex === 5) && typeof decodedItemDisplay === 'string' && decodedItemDisplay.startsWith('0x')) {
+                        decodedItemDisplay = decodedItemDisplay.substring(2);
+                      }
                     }
 
                     return (
