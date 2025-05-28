@@ -210,19 +210,39 @@ export default function HashSwiftPage() {
           <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md">
             <div className="space-y-2">
               {chunk.map((item: string, itemIndex: number) => {
-                let decodedItem;
-                // Le premier (index 0), le troisième (index 2), et le septième (index 6) de chaque chunk
-                if (itemIndex === 0 || itemIndex === 2 || itemIndex === 6) {
-                  decodedItem = decodeBase64(item, 'number');
-                } else {
-                  decodedItem = decodeBase64(item, 'string');
+                let decodedItemDisplay;
+                
+                if (itemIndex === 0) { // Premier élément du chunk
+                  return null; // Ne pas afficher le premier champ
+                } else if (itemIndex === 2) { // Troisième élément du chunk
+                  decodedItemDisplay = decodeBase64(item, 'number');
+                } else if (itemIndex === 6) { // Septième élément du chunk
+                  const decodedNumberString = decodeBase64(item, 'number');
+                  if (decodedNumberString.startsWith("Error:")) {
+                    decodedItemDisplay = `Error converting to date: ${decodedNumberString}`;
+                  } else {
+                    try {
+                      const timestamp = parseInt(decodedNumberString, 10);
+                      if (isNaN(timestamp)) {
+                        decodedItemDisplay = `Error: Decoded value for date is not a number ("${decodedNumberString}")`;
+                      } else {
+                        const dateObject = new Date(timestamp * 1000); // Timestamp Unix est en secondes
+                        decodedItemDisplay = dateObject.toLocaleString(); // Date et heure locales
+                      }
+                    } catch (e: any) {
+                      decodedItemDisplay = `Error parsing/converting date: ${e.message}`;
+                    }
+                  }
+                } else { // Autres éléments
+                  decodedItemDisplay = decodeBase64(item, 'string');
                 }
+
                 return (
                   <div 
                     key={`item-${groupIndex}-${itemIndex}`} 
                     className="p-3 border rounded-md bg-background font-mono text-sm break-all shadow-sm"
                   >
-                    {decodedItem}
+                    {decodedItemDisplay}
                   </div>
                 );
               })}
@@ -458,5 +478,7 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
+    
 
     
