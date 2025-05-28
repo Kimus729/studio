@@ -208,7 +208,7 @@ export default function HashSwiftPage() {
       <div className="space-y-4">
         {chunks.map((chunk, groupIndex) => (
           <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md">
-            <div className="space-y-2">
+            <div className="space-y-1"> {/* Reduced space-y from 2 to 1 */}
               {chunk.map((item: string, itemIndex: number) => {
                 let decodedItemDisplay;
                 
@@ -240,7 +240,8 @@ export default function HashSwiftPage() {
                 return (
                   <div 
                     key={`item-${groupIndex}-${itemIndex}`} 
-                    className="p-3 border rounded-md bg-background font-mono text-sm break-all shadow-sm"
+                    // Reduced padding from p-3 to p-2, text-sm to text-xs, and removed shadow-sm
+                    className="p-2 border rounded-md bg-background font-mono text-xs break-all" 
                   >
                     {decodedItemDisplay}
                   </div>
@@ -478,6 +479,8 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
+    
 
     
 
