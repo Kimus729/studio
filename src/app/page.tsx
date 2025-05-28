@@ -34,7 +34,7 @@ export default function HashSwiftPage() {
     if (fileToProcess) {
       setSelectedFile(fileToProcess);
       setHashError(null);
-      setFileHash(null); // Reset previous hash
+      setFileHash(null); 
       setIsHashLoading(true);
       try {
         const arrayBuffer = await fileToProcess.arrayBuffer();
@@ -42,9 +42,17 @@ export default function HashSwiftPage() {
         const hashArray = Array.from(new Uint8Array(hashBuffer));
         const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
         setFileHash(hashHex);
+
+        // Update argsInputs for VM Query Executor with the new hash
+        const newVmArgs = [hashHex]; // For getPrintInfoFromHash, only one arg is needed
+        setArgsInputs(newVmArgs); 
+
+        // Automatically execute the VM query with the new hash
+        await handleVmQuerySubmit(newVmArgs);
+
       } catch (err) {
-        console.error("Error calculating hash:", err);
-        setHashError("Failed to calculate hash. Please try again.");
+        console.error("Error processing file or executing VM query:", err);
+        setHashError("Failed to calculate hash or execute VM query. Please try again.");
         setFileHash(null);
       } finally {
         setIsHashLoading(false);
@@ -79,7 +87,6 @@ export default function HashSwiftPage() {
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     event.stopPropagation();
-    // Check if the mouse is leaving the actual drop zone and not just moving over a child element.
     if (!event.currentTarget.contains(event.relatedTarget as Node)) {
       setIsDraggingOver(false);
     }
@@ -118,7 +125,6 @@ export default function HashSwiftPage() {
     }
   };
 
-  // VM Query Executor functions
   const handleAddArgInput = () => {
     setArgsInputs([...argsInputs, ""]);
   };
@@ -133,11 +139,11 @@ export default function HashSwiftPage() {
     );
   };
 
-  const handleVmQuerySubmit = async () => {
+  const handleVmQuerySubmit = async (overrideArgs?: string[]) => {
     setIsVmQueryLoading(true);
     setVmQueryError(null);
     setVmQueryResponse(null);
-    setOpenGroups({}); // Reset open groups on new query
+    setOpenGroups({}); 
 
     if (!scAddressInput.trim() || !funcNameInput.trim()) {
       setVmQueryError("SC Address and Function Name cannot be empty.");
@@ -146,9 +152,12 @@ export default function HashSwiftPage() {
     }
 
     try {
-      const processedArgs = argsInputs
+      const currentArgs = overrideArgs || argsInputs;
+      // Arguments are expected to be in hex format already if needed by the SC function.
+      // The hashHex is already hex. Other user-typed args should also be hex if required.
+      const processedArgs = currentArgs
         .filter(arg => arg.trim() !== "")
-        .map(arg => arg.trim());
+        .map(arg => arg.trim()); // No more stringToHex here
       
       const payload = {
         scAddress: scAddressInput.trim(),
@@ -166,13 +175,19 @@ export default function HashSwiftPage() {
       });
 
       if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch (e) {
-          errorData = { message: `HTTP error! status: ${response.status}. Response not in JSON format.` };
+        if (response.status === 400) {
+          setVmQueryError("Bad VM Query");
+        } else {
+          let errorData;
+          try {
+            errorData = await response.json();
+            setVmQueryError(errorData?.error || errorData?.message || `HTTP error! status: ${response.status}`);
+          } catch (e) {
+            setVmQueryError(`HTTP error! status: ${response.status}. Response not in JSON format.`);
+          }
         }
-        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+        setIsVmQueryLoading(false);
+        return; // Important to return here after setting error
       }
 
       const data = await response.json();
@@ -207,7 +222,7 @@ export default function HashSwiftPage() {
           result = (result << 8n) + BigInt(bytes[i]);
         }
         return result.toString();
-      } else { // decodeAs === 'string'
+      } else { 
         if (bytes.length === 0) {
           return ""; 
         }
@@ -240,14 +255,25 @@ export default function HashSwiftPage() {
   const renderVmQueryResponse = (responseData: any) => {
     const returnData = responseData?.data?.data?.returnData;
 
+    if (!responseData || typeof responseData !== 'object' || Object.keys(responseData).length === 0) {
+      return <p className="text-muted-foreground p-4 text-center">No response data.</p>;
+    }
+    
     if (!returnData || !Array.isArray(returnData) || returnData.length === 0) {
-      if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
-        return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
-      }
       if (responseData?.data?.data && (!returnData || returnData.length === 0)) {
-         return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
+         return (
+            <>
+                <p className="text-muted-foreground p-4 text-center">No 'returnData' found or it's empty. Displaying full response:</p>
+                <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>
+            </>
+         );
       }
-      return <p className="text-muted-foreground p-4 text-center">No 'returnData' found or it's empty. Displaying full response if available.</p>;
+      return (
+        <>
+            <p className="text-muted-foreground p-4 text-center">No 'returnData' found. Displaying full response:</p>
+            <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>
+        </>
+      );
     }
     
     const CHUNK_SIZE = 7;
@@ -258,9 +284,13 @@ export default function HashSwiftPage() {
 
     const displayableChunks = potentialChunks.filter(chunk => chunk.length > 1);
 
-
     if (displayableChunks.length === 0) {
-      return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
+       return (
+        <>
+            <p className="text-muted-foreground p-4 text-center">'returnData' exists but no displayable groups. Displaying full response:</p>
+            <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>
+        </>
+      );
     }
 
     return (
@@ -282,7 +312,7 @@ export default function HashSwiftPage() {
                 aria-expanded={isGroupOpen}
                 aria-controls={`group-content-${groupIndex}`}
               >
-                <span className="truncate">{toggleHeaderContent}</span>
+                <span className="truncate">{toggleHeaderContent || `Group ${groupIndex + 1}`}</span>
                 {isGroupOpen ? <ChevronUp className="h-5 w-5 flex-shrink-0 ml-2" /> : <ChevronDown className="h-5 w-5 flex-shrink-0 ml-2" />}
               </div>
 
@@ -317,10 +347,10 @@ export default function HashSwiftPage() {
                     let decodedItemDisplay: React.ReactNode;
                     let rawDecodedValue: string = "";
                     
-                    if (itemIndex === 2) { 
+                    if (itemIndex === 2) { // Nonce (Original index 2)
                       rawDecodedValue = decodeBase64(item, 'number');
                       decodedItemDisplay = rawDecodedValue;
-                    } else if (itemIndex === 6) { 
+                    } else if (itemIndex === 6) { // Date/Heure (Original index 6)
                       const decodedNumberString = decodeBase64(item, 'number');
                       rawDecodedValue = decodedNumberString;
                       if (decodedNumberString.startsWith("Error:")) {
@@ -338,17 +368,18 @@ export default function HashSwiftPage() {
                           decodedItemDisplay = `Error parsing/converting date: ${e.message}`;
                         }
                       }
-                    } else { 
+                    } else { // Other items
                       rawDecodedValue = decodeBase64(item, 'string');
                       decodedItemDisplay = rawDecodedValue;
                       if ((itemIndex === 4 || itemIndex === 5) && typeof decodedItemDisplay === 'string' && decodedItemDisplay.startsWith('0x')) {
+                        // itemIndex 4 = Hash du fichier, itemIndex 5 = Transaction
                         decodedItemDisplay = decodedItemDisplay.substring(2);
-                        if (itemIndex === 5) rawDecodedValue = decodedItemDisplay; 
+                         if (itemIndex === 5) rawDecodedValue = decodedItemDisplay; // Store the 0x-stripped value for link
                       }
                     }
 
-                    if (itemIndex === 5 && typeof rawDecodedValue === 'string' && rawDecodedValue && !rawDecodedValue.startsWith("Error:")) {
-                        const txHash = rawDecodedValue;
+                    if (itemIndex === 5 && typeof rawDecodedValue === 'string' && rawDecodedValue && !rawDecodedValue.startsWith("Error:")) { // Transaction (Original index 5)
+                        const txHash = rawDecodedValue; // Already stripped of 0x if present
                         decodedItemDisplay = (
                           <a
                             href={`https://devnet-explorer.multiversx.com/transactions/${txHash}`}
@@ -447,7 +478,7 @@ export default function HashSwiftPage() {
             )}
           </div>
 
-          {isHashLoading && (
+          {isHashLoading && !vmQueryError && ( // Only show hash loading if no vm query error from auto-submit
             <div className="flex items-center justify-center space-x-2 text-accent p-4 rounded-md bg-accent/10">
               <Loader2 className="h-6 w-6 animate-spin" />
               <span className="text-base font-medium">Calculating hash...</span>
@@ -501,7 +532,7 @@ export default function HashSwiftPage() {
             VM Query Executor
           </CardTitle>
           <CardDescription className="text-center text-muted-foreground pt-1">
-            Execute smart contract queries on the MultiversX devnet.
+            Execute smart contract queries on the MultiversX devnet. Arguments should be in hex format if required by the SC.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -531,7 +562,7 @@ export default function HashSwiftPage() {
           </div>
 
           <div className="space-y-3">
-            <Label className="text-base font-medium">Arguments (human-readable)</Label>
+            <Label className="text-base font-medium">Arguments (hex-encoded if required by SC)</Label>
             {argsInputs.map((arg, index) => (
               <div key={index} className="flex items-center space-x-2">
                 <Input
@@ -547,7 +578,7 @@ export default function HashSwiftPage() {
                   variant="outline"
                   size="icon"
                   onClick={() => handleRemoveArgInput(index)}
-                  disabled={isVmQueryLoading}
+                  disabled={isVmQueryLoading || argsInputs.length <= 1} // Keep at least one argument
                   className="h-11 w-11 flex-shrink-0 shadow-sm hover:shadow-md"
                   aria-label={`Remove argument ${index + 1}`}
                 >
@@ -566,7 +597,7 @@ export default function HashSwiftPage() {
           </div>
 
           <Button 
-            onClick={handleVmQuerySubmit} 
+            onClick={() => handleVmQuerySubmit()} // Call without args to use current state
             disabled={isVmQueryLoading} 
             className="w-full mt-4 h-12 text-base shadow-md hover:shadow-lg transition-shadow"
             size="lg"
@@ -615,3 +646,4 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
