@@ -142,37 +142,39 @@ export default function HashSwiftPage() {
   };
   
   const decodeBase64 = (base64String: string): string => {
+    if (!base64String) return ""; // Handle empty or null strings
     try {
       // Check if the string is already decoded or not valid base64
-      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64String) && base64String.length % 4 !== 0) {
-        // Heuristic: if it doesn't look like base64, return as is (might be already decoded)
-        // This is a simple check and might need refinement for edge cases.
-        if (/^[\x20-\x7E]*$/.test(base64String) && base64String.trim() !== '') {
-          return base64String; 
-        }
+      // A more robust check for base64:
+      const isBase64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64String);
+
+      if (!isBase64) {
+         // If it doesn't look like base64, return as is (might be already decoded or other format)
+        return base64String;
       }
 
       const binaryString = atob(base64String);
+      // Attempt to decode as UTF-8
       try {
-        // Attempt to decode as UTF-8
         return new TextDecoder('utf-8', { fatal: true }).decode(
           Uint8Array.from(binaryString, c => c.charCodeAt(0))
         );
       } catch (utf8Error) {
-        // If UTF-8 fails, check if it's a simple number string
-        if (/^\d+$/.test(binaryString)) {
-            return binaryString; // Return as is if it's a number
-        }
-        // If not a number, check if it's printable ASCII (and not just whitespace)
-        if (/^[\x20-\x7E]*$/.test(binaryString) && binaryString.trim() !== '') {
-          return binaryString; // Return as is if printable ASCII
-        }
-        // Fallback: convert to hex if it's not clearly text or number
-        let hex = "";
+        // If UTF-8 fails, it might be raw binary data not intended as text.
+        // Convert to hex for a readable representation.
+        let hex = "0x";
         for (let i = 0; i < binaryString.length; i++) {
           hex += binaryString.charCodeAt(i).toString(16).padStart(2, '0');
         }
-        return `0x${hex}`; // Prefix with 0x to indicate hex
+        // If the hex string is very short (e.g. just "0x" or "0x00"), 
+        // it might represent a small number. Try to parse it.
+        if (hex.length <= 6 && /^0x[0-9a-fA-F]+$/.test(hex)) {
+            const num = parseInt(hex, 16);
+            if (!isNaN(num) && num.toString(16).padStart(hex.length-2,'0') === hex.substring(2)) { // check if conversion is precise
+                return num.toString();
+            }
+        }
+        return hex; // Default to hex for non-UTF8 binary data
       }
     } catch (e) {
       // This catch is for `atob` if the base64 string itself is invalid or other errors during decoding
@@ -185,17 +187,37 @@ export default function HashSwiftPage() {
     const returnData = responseData?.data?.data?.returnData;
 
     if (!returnData || !Array.isArray(returnData) || returnData.length === 0) {
+      // Check if the entire response is an empty object
       if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
         return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
       }
-      return <p className="text-muted-foreground p-4 text-center">No 'returnData' found or it's empty. Showing full response.</p>;
+      // Check if 'data.data' exists but 'returnData' is missing or empty
+      if (responseData?.data?.data && (!returnData || returnData.length === 0)) {
+         return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
+      }
+      return <p className="text-muted-foreground p-4 text-center">No 'returnData' found or it's empty. Displaying full response if available.</p>;
+    }
+    
+    const CHUNK_SIZE = 7;
+    const chunks = [];
+    for (let i = 0; i < returnData.length; i += CHUNK_SIZE) {
+      chunks.push(returnData.slice(i, i + CHUNK_SIZE));
     }
 
     return (
-      <div className="space-y-2">
-        {returnData.map((item: string, index: number) => (
-          <div key={index} className="p-2 border rounded-md bg-background font-mono text-sm break-all">
-            {decodeBase64(item)}
+      <div className="space-y-4"> {/* Main container for all groups */}
+        {chunks.map((chunk, groupIndex) => (
+          <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md"> {/* Group container */}
+            <div className="space-y-2"> {/* Container for items within a group */}
+              {chunk.map((item: string, itemIndex: number) => (
+                <div 
+                  key={`item-${groupIndex}-${itemIndex}`} 
+                  className="p-3 border rounded-md bg-background font-mono text-sm break-all shadow-sm" // Individual item style
+                >
+                  {decodeBase64(item)}
+                </div>
+              ))}
+            </div>
           </div>
         ))}
       </div>
@@ -427,4 +449,3 @@ export default function HashSwiftPage() {
     </main>
   );
 }
-
