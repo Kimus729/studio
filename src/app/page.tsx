@@ -392,7 +392,7 @@ export default function HashSwiftPage() {
               <Label className="text-base font-medium text-foreground">
                 VM Query Response (Full JSON)
               </Label>
-              <ScrollArea className="h-auto max-h-[28rem] w-full rounded-md border bg-muted/50 shadow-inner p-3">
+              <ScrollArea className="h-auto max-h-[32rem] w-full rounded-md border bg-muted/50 shadow-inner p-3">
                 {renderVmQueryResponse(vmQueryResponse)}
               </ScrollArea>
             </div>
@@ -410,4 +410,3 @@ export default function HashSwiftPage() {
     </main>
   );
 }
-
