@@ -198,7 +198,6 @@ export default function HashSwiftPage() {
       if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
         return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
       }
-      // If returnData exists in structure but is empty array, show full response
       if (responseData?.data?.data && (!returnData || returnData.length === 0)) {
          return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
       }
@@ -214,7 +213,6 @@ export default function HashSwiftPage() {
     const displayableChunks = potentialChunks.filter(chunk => chunk.length > 1);
 
     if (displayableChunks.length === 0) {
-      // If returnData was not empty, but no chunks are suitable for accordion display, show full response
       return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
     }
 
@@ -222,8 +220,7 @@ export default function HashSwiftPage() {
       <div className="space-y-4">
         {displayableChunks.map((chunk, groupIndex) => {
           const isGroupOpen = !!openGroups[groupIndex];
-          // chunk[0] is skipped. chunk[1] (if exists) is the first displayed item and toggle header.
-          const toggleHeaderContent = decodeBase64(chunk[1], 'string');
+          const toggleHeaderContent = decodeBase64(chunk[1], 'string'); // chunk[1] is the header
 
           return (
             <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md">
@@ -243,19 +240,26 @@ export default function HashSwiftPage() {
               {isGroupOpen && (
                 <div id={`group-content-${groupIndex}`} className="space-y-1 mt-2">
                   {chunk.map((item: string, itemIndex: number) => {
-                    // itemIndex is the original index in the chunk (0-6)
-                    // We display items from original index 2 up to 6 here.
-                    // chunk[0] is never displayed.
-                    // chunk[1] is the toggle header, so also skipped here.
-                    if (itemIndex < 2) { 
+                    if (itemIndex < 2) { // chunk[0] is skipped, chunk[1] is the header
                       return null;
                     }
 
+                    const fieldLabels = [
+                      "Nonce",              // Corresponds to chunk[2] (itemIndex 2)
+                      "Nom",                // Corresponds to chunk[3] (itemIndex 3)
+                      "Hash du fichier",    // Corresponds to chunk[4] (itemIndex 4)
+                      "Transaction",        // Corresponds to chunk[5] (itemIndex 5)
+                      "Date/Heure Enregistrement" // Corresponds to chunk[6] (itemIndex 6)
+                    ];
+                    // The label index will be itemIndex - 2 because we skip the first two items of the chunk
+                    // (chunk[0] and chunk[1] which is the header) for display under the header.
+                    const label = fieldLabels[itemIndex - 2];
+
                     let decodedItemDisplay;
                     
-                    if (itemIndex === 2) { // Original third item in chunk
+                    if (itemIndex === 2) { // Original third item in chunk (Nonce)
                       decodedItemDisplay = decodeBase64(item, 'number');
-                    } else if (itemIndex === 6) { // Original seventh item in chunk
+                    } else if (itemIndex === 6) { // Original seventh item in chunk (Date/Heure Enregistrement)
                       const decodedNumberString = decodeBase64(item, 'number');
                       if (decodedNumberString.startsWith("Error:")) {
                         decodedItemDisplay = `Error converting to date: ${decodedNumberString}`;
@@ -272,7 +276,7 @@ export default function HashSwiftPage() {
                           decodedItemDisplay = `Error parsing/converting date: ${e.message}`;
                         }
                       }
-                    } else { // Other items (original indices 3, 4, 5 in chunk)
+                    } else { // Other items (original indices 3, 4, 5 in chunk: Nom, Hash, Transaction)
                       decodedItemDisplay = decodeBase64(item, 'string');
                     }
 
@@ -281,6 +285,7 @@ export default function HashSwiftPage() {
                         key={`item-${groupIndex}-${itemIndex}`} 
                         className="p-2 border rounded-md bg-background font-mono text-xs break-all" 
                       >
+                        <span className="font-semibold">{label}: </span>
                         {decodedItemDisplay}
                       </div>
                     );
@@ -519,3 +524,4 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
