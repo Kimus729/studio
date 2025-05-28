@@ -75,10 +75,6 @@ export default function HashSwiftPage() {
   };
 
   // VM Query Executor functions
-  const stringToHex = (str: string): string => {
-    return str.split("").map(c => c.charCodeAt(0).toString(16).padStart(2, "0").toUpperCase()).join("");
-  };
-
   const handleAddArgInput = () => {
     setArgsInputs([...argsInputs, ""]);
   };
@@ -105,14 +101,14 @@ export default function HashSwiftPage() {
     }
 
     try {
-      const hexEncodedArgs = argsInputs
+      const processedArgs = argsInputs
         .filter(arg => arg.trim() !== "")
-        .map(arg => stringToHex(arg.trim()));
+        .map(arg => arg.trim());
       
       const payload = {
         scAddress: scAddressInput.trim(),
         funcName: funcNameInput.trim(),
-        args: hexEncodedArgs,
+        args: processedArgs, // Arguments are no longer hex-encoded
       };
 
       const response = await fetch("https://devnet-gateway.multiversx.com/vm-values/query", {
@@ -345,7 +341,7 @@ export default function HashSwiftPage() {
           </div>
 
           <div className="space-y-3">
-            <Label className="text-base font-medium">Arguments (human-readable, will be hex-encoded)</Label>
+            <Label className="text-base font-medium">Arguments (human-readable)</Label>
             {argsInputs.map((arg, index) => (
               <div key={index} className="flex items-center space-x-2">
                 <Input
@@ -427,3 +423,4 @@ export default function HashSwiftPage() {
     </main>
   );
 }
+
