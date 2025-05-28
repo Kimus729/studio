@@ -143,6 +143,15 @@ export default function HashSwiftPage() {
   
   const decodeBase64 = (base64String: string): string => {
     try {
+      // Check if the string is already decoded or not valid base64
+      if (!/^[A-Za-z0-9+/]*={0,2}$/.test(base64String) && base64String.length % 4 !== 0) {
+        // Heuristic: if it doesn't look like base64, return as is (might be already decoded)
+        // This is a simple check and might need refinement for edge cases.
+        if (/^[\x20-\x7E]*$/.test(base64String) && base64String.trim() !== '') {
+          return base64String; 
+        }
+      }
+
       const binaryString = atob(base64String);
       try {
         // Attempt to decode as UTF-8
@@ -166,23 +175,30 @@ export default function HashSwiftPage() {
         return `0x${hex}`; // Prefix with 0x to indicate hex
       }
     } catch (e) {
-      // This catch is for `atob` if the base64 string itself is invalid
-      console.error("Error in atob for base64 string:", base64String, e);
-      return "Error decoding base64 (invalid input)";
+      // This catch is for `atob` if the base64 string itself is invalid or other errors during decoding
+      console.warn("Could not decode base64 string, returning as is:", base64String, e);
+      return base64String; // Return original string if any decoding step fails
     }
   };
 
   const renderVmQueryResponse = (responseData: any) => {
-    // Check if responseData is an empty object
-    if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
-      return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
+    const returnData = responseData?.data?.data?.returnData;
+
+    if (!returnData || !Array.isArray(returnData) || returnData.length === 0) {
+      if (responseData && typeof responseData === 'object' && Object.keys(responseData).length === 0 && responseData.constructor === Object) {
+        return <p className="text-muted-foreground p-4 text-center">Response is an empty object.</p>;
+      }
+      return <p className="text-muted-foreground p-4 text-center">No 'returnData' found or it's empty. Showing full response.</p>;
     }
-    
-    // Pretty-print the entire JSON object
+
     return (
-      <pre className="font-mono text-sm break-all whitespace-pre-wrap">
-        {JSON.stringify(responseData, null, 2)}
-      </pre>
+      <div className="space-y-2">
+        {returnData.map((item: string, index: number) => (
+          <div key={index} className="p-2 border rounded-md bg-background font-mono text-sm break-all">
+            {decodeBase64(item)}
+          </div>
+        ))}
+      </div>
     );
   };
 
@@ -388,7 +404,7 @@ export default function HashSwiftPage() {
           {vmQueryResponse && !isVmQueryLoading && !vmQueryError && (
             <div className="space-y-3 pt-4 mt-4">
               <Label className="text-base font-medium text-foreground">
-                VM Query Response (Full JSON)
+                Decoded ReturnData
               </Label>
               <ScrollArea 
                 type="always" 
@@ -411,4 +427,3 @@ export default function HashSwiftPage() {
     </main>
   );
 }
-
