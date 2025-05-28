@@ -283,7 +283,7 @@ export default function HashSwiftPage() {
                     return (
                       <div 
                         key={`item-${groupIndex}-${itemIndex}`} 
-                        className="p-2 border rounded-md bg-background font-mono text-xs break-all" 
+                        className="p-2 font-mono text-xs break-all" 
                       >
                         <span className="font-semibold">{label}: </span>
                         {decodedItemDisplay}
