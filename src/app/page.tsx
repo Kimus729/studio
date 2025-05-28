@@ -215,27 +215,20 @@ export default function HashSwiftPage() {
       potentialChunks.push(returnData.slice(i, i + CHUNK_SIZE));
     }
 
-    // We only want to display chunks that have more than the header (chunk[1])
-    // because chunk[0] is hidden and chunk[1] is the header.
-    // So, effectively, chunks with length > 1 could be displayable if they meet the criteria.
-    // However, since we process based on CHUNK_SIZE = 7, we expect full chunks or a partial last one.
-    // The user's request implies that the structure of 7 elements per meaningful group is expected.
     const displayableChunks = potentialChunks.filter(chunk => chunk.length > 1);
 
 
     if (displayableChunks.length === 0) {
-      // If no chunks are displayable (e.g., returnData was [""], [null, "abc"])
-      // show the full JSON response as a fallback.
       return <pre className="p-3 bg-muted/80 rounded-md text-sm whitespace-pre-wrap break-all font-mono">{JSON.stringify(responseData, null, 2)}</pre>;
     }
 
     return (
       <div className="space-y-4">
         {displayableChunks.map((chunk, groupIndex) => {
-          if (chunk.length < 2) return null; // Should not happen due to filter, but good practice
+          if (chunk.length < 2) return null; 
 
           const isGroupOpen = !!openGroups[groupIndex];
-          const toggleHeaderContent = decodeBase64(chunk[1], 'string'); // chunk[1] is the header
+          const toggleHeaderContent = decodeBase64(chunk[1], 'string'); 
 
           return (
             <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md">
@@ -255,15 +248,12 @@ export default function HashSwiftPage() {
               {isGroupOpen && (
                 <div id={`group-content-${groupIndex}`} className="space-y-1 mt-2">
                   {chunk.map((item: string, itemIndex: number) => {
-                    // Skip chunk[0] (always hidden) and chunk[1] (used as header) for individual display
                     if (itemIndex < 2) { 
                       return null;
                     }
-                    // Ensure we don't try to process fields if the chunk is too short for them
                     if (itemIndex >= chunk.length) {
                         return null;
                     }
-
 
                     const fieldLabels = [
                       "Nonce",              // Corresponds to chunk[2] (itemIndex 2)
@@ -273,11 +263,8 @@ export default function HashSwiftPage() {
                       "Date/Heure Enregistrement" // Corresponds to chunk[6] (itemIndex 6)
                     ];
                     
-                    // The label index will be itemIndex - 2 because we skip the first two items of the chunk
-                    // (chunk[0] and chunk[1] which is the header) for display under the header.
                     const labelIndex = itemIndex - 2;
                     if (labelIndex < 0 || labelIndex >= fieldLabels.length) {
-                        // This case should ideally not be reached if chunk structure is consistent
                         return (
                             <div key={`item-${groupIndex}-${itemIndex}-error`} className="p-2 font-mono text-xs text-destructive break-all">
                                 Error: Label not found for item index {itemIndex}.
@@ -286,12 +273,15 @@ export default function HashSwiftPage() {
                     }
                     const label = fieldLabels[labelIndex];
 
-                    let decodedItemDisplay;
+                    let decodedItemDisplay: React.ReactNode;
+                    let rawDecodedValue: string = "";
                     
-                    if (itemIndex === 2) { // Original third item in chunk (Nonce)
-                      decodedItemDisplay = decodeBase64(item, 'number');
-                    } else if (itemIndex === 6) { // Original seventh item in chunk (Date/Heure Enregistrement)
+                    if (itemIndex === 2) { 
+                      rawDecodedValue = decodeBase64(item, 'number');
+                      decodedItemDisplay = rawDecodedValue;
+                    } else if (itemIndex === 6) { 
                       const decodedNumberString = decodeBase64(item, 'number');
+                      rawDecodedValue = decodedNumberString;
                       if (decodedNumberString.startsWith("Error:")) {
                         decodedItemDisplay = `Error converting to date: ${decodedNumberString}`;
                       } else {
@@ -300,21 +290,36 @@ export default function HashSwiftPage() {
                           if (isNaN(timestamp)) {
                             decodedItemDisplay = `Error: Decoded value for date is not a number ("${decodedNumberString}")`;
                           } else {
-                            const dateObject = new Date(timestamp * 1000); // Unix timestamp is in seconds
-                            decodedItemDisplay = dateObject.toLocaleString(); // Local date and time
+                            const dateObject = new Date(timestamp * 1000); 
+                            decodedItemDisplay = dateObject.toLocaleString(); 
                           }
                         } catch (e: any) {
                           decodedItemDisplay = `Error parsing/converting date: ${e.message}`;
                         }
                       }
-                    } else { // Other items (original indices 3, 4, 5 in chunk: Nom, Hash, Transaction)
-                      decodedItemDisplay = decodeBase64(item, 'string');
-                      // itemIndex 4 is "Hash du fichier" (3rd field under label)
-                      // itemIndex 5 is "Transaction" (4th field under label)
+                    } else { 
+                      rawDecodedValue = decodeBase64(item, 'string');
+                      decodedItemDisplay = rawDecodedValue;
                       if ((itemIndex === 4 || itemIndex === 5) && typeof decodedItemDisplay === 'string' && decodedItemDisplay.startsWith('0x')) {
                         decodedItemDisplay = decodedItemDisplay.substring(2);
+                        if (itemIndex === 5) rawDecodedValue = decodedItemDisplay; // Update rawDecodedValue for transaction link
                       }
                     }
+
+                    if (itemIndex === 5 && typeof rawDecodedValue === 'string' && rawDecodedValue && !rawDecodedValue.startsWith("Error:")) {
+                        const txHash = rawDecodedValue;
+                        decodedItemDisplay = (
+                          <a
+                            href={`https://devnet-explorer.multiversx.com/transactions/${txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-accent hover:underline"
+                          >
+                            {txHash}
+                          </a>
+                        );
+                    }
+
 
                     return (
                       <div 
@@ -560,4 +565,3 @@ export default function HashSwiftPage() {
     </main>
   );
 }
-
