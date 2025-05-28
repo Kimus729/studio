@@ -29,12 +29,14 @@ export default function HashSwiftPage() {
   const [isVmQueryLoading, setIsVmQueryLoading] = React.useState<boolean>(false);
   const [vmQueryError, setVmQueryError] = React.useState<string | null>(null);
   const [openGroups, setOpenGroups] = React.useState<Record<number, boolean>>({});
+  const [isQueryParametersOpen, setIsQueryParametersOpen] = React.useState<boolean>(false);
+
 
   const processFile = async (fileToProcess: File | null) => {
     if (fileToProcess) {
       setSelectedFile(fileToProcess);
       setHashError(null);
-      setFileHash(null); 
+      setFileHash(null);
       setIsHashLoading(true);
       try {
         const arrayBuffer = await fileToProcess.arrayBuffer();
@@ -43,11 +45,9 @@ export default function HashSwiftPage() {
         const hashHex = hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
         setFileHash(hashHex);
 
-        // Update argsInputs for VM Query Executor with the new hash
-        const newVmArgs = [hashHex]; // For getPrintInfoFromHash, only one arg is needed
-        setArgsInputs(newVmArgs); 
+        const newVmArgs = [hashHex];
+        setArgsInputs(newVmArgs);
 
-        // Automatically execute the VM query with the new hash
         await handleVmQuerySubmit(newVmArgs);
 
       } catch (err) {
@@ -143,7 +143,7 @@ export default function HashSwiftPage() {
     setIsVmQueryLoading(true);
     setVmQueryError(null);
     setVmQueryResponse(null);
-    setOpenGroups({}); 
+    setOpenGroups({});
 
     if (!scAddressInput.trim() || !funcNameInput.trim()) {
       setVmQueryError("SC Address and Function Name cannot be empty.");
@@ -153,12 +153,10 @@ export default function HashSwiftPage() {
 
     try {
       const currentArgs = overrideArgs || argsInputs;
-      // Arguments are expected to be in hex format already if needed by the SC function.
-      // The hashHex is already hex. Other user-typed args should also be hex if required.
       const processedArgs = currentArgs
         .filter(arg => arg.trim() !== "")
-        .map(arg => arg.trim()); 
-      
+        .map(arg => arg.trim());
+
       const payload = {
         scAddress: scAddressInput.trim(),
         funcName: funcNameInput.trim(),
@@ -187,7 +185,7 @@ export default function HashSwiftPage() {
           }
         }
         setIsVmQueryLoading(false);
-        return; // Important to return here after setting error
+        return;
       }
 
       const data = await response.json();
@@ -200,31 +198,31 @@ export default function HashSwiftPage() {
       setIsVmQueryLoading(false);
     }
   };
-  
+
   const decodeBase64 = (base64String: string, decodeAs: 'string' | 'number' = 'string'): string => {
     if (base64String === null || base64String === undefined) {
       return decodeAs === 'number' ? "Error: Input is null/undefined" : "";
     }
     if (base64String === "") {
-      return decodeAs === 'number' ? "0" : ""; 
+      return decodeAs === 'number' ? "0" : "";
     }
 
     try {
-      const binaryString = atob(base64String); 
+      const binaryString = atob(base64String);
       const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
 
       if (decodeAs === 'number') {
         if (bytes.length === 0) {
-          return "0"; 
+          return "0";
         }
         let result = 0n;
         for (let i = 0; i < bytes.length; i++) {
           result = (result << 8n) + BigInt(bytes[i]);
         }
         return result.toString();
-      } else { 
+      } else {
         if (bytes.length === 0) {
-          return ""; 
+          return "";
         }
         try {
           return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -236,12 +234,12 @@ export default function HashSwiftPage() {
           return hex;
         }
       }
-    } catch (e: any) { 
+    } catch (e: any) {
       console.warn(`Error decoding base64 string "${base64String}" as ${decodeAs}: ${e.message}`);
       if (decodeAs === 'number') {
         return `Error: Not a valid Base64-encoded number ("${base64String}")`;
       }
-      if (e.name === 'InvalidCharacterError') { 
+      if (e.name === 'InvalidCharacterError') {
          return base64String;
       }
       return `Error decoding as string: ${e.message}`;
@@ -259,18 +257,16 @@ export default function HashSwiftPage() {
     if (!responseData || typeof responseData !== 'object' || Object.keys(responseData).length === 0) {
       return <p className="text-muted-foreground p-4 text-center">Aucune donnée de réponse.</p>;
     }
-    
+
     const dataBlock = responseData?.data?.data;
     const returnDataArray = dataBlock?.returnData;
 
-    // Case 1: 'returnData' is an empty array.
     if (Array.isArray(returnDataArray) && returnDataArray.length === 0) {
         return (
             <p className="text-muted-foreground p-4 text-center">{customNoRecordMessage}</p>
         );
     }
-    
-    // Case 2 & 3: 'returnData' is missing, null, or not an array.
+
     if (!returnDataArray || !Array.isArray(returnDataArray)) {
         let detailMessage = "";
         if (dataBlock && typeof dataBlock === 'object' && 'returnData' in dataBlock) {
@@ -292,8 +288,7 @@ export default function HashSwiftPage() {
             </>
         );
     }
-    
-    // If we reach here, returnDataArray is a non-empty array. Proceed with chunking.
+
     const CHUNK_SIZE = 7;
     const potentialChunks = [];
     for (let i = 0; i < returnDataArray.length; i += CHUNK_SIZE) {
@@ -314,10 +309,10 @@ export default function HashSwiftPage() {
     return (
       <div className="space-y-4">
         {displayableChunks.map((chunk, groupIndex) => {
-          if (chunk.length < 2) return null; 
+          if (chunk.length < 2) return null;
 
           const isGroupOpen = !!openGroups[groupIndex];
-          const toggleHeaderContent = decodeBase64(chunk[1], 'string'); 
+          const toggleHeaderContent = decodeBase64(chunk[1], 'string');
 
           return (
             <div key={`group-${groupIndex}`} className="p-4 border border-border rounded-lg bg-card/40 shadow-md">
@@ -337,7 +332,7 @@ export default function HashSwiftPage() {
               {isGroupOpen && (
                 <div id={`group-content-${groupIndex}`} className="space-y-1 mt-2">
                   {chunk.map((item: string, itemIndex: number) => {
-                    if (itemIndex < 2) { 
+                    if (itemIndex < 2) {
                       return null;
                     }
                     if (itemIndex >= chunk.length) {
@@ -345,13 +340,13 @@ export default function HashSwiftPage() {
                     }
 
                     const fieldLabels = [
-                      "Nonce",              // Corresponds to chunk[2] (itemIndex 2)
-                      "Nom",                // Corresponds to chunk[3] (itemIndex 3)
-                      "Hash du fichier",    // Corresponds to chunk[4] (itemIndex 4)
-                      "Transaction",        // Corresponds to chunk[5] (itemIndex 5)
-                      "Date/Heure Enregistrement" // Corresponds to chunk[6] (itemIndex 6)
+                      "Nonce",
+                      "Nom",
+                      "Hash du fichier",
+                      "Transaction",
+                      "Date/Heure Enregistrement"
                     ];
-                    
+
                     const labelIndex = itemIndex - 2;
                     if (labelIndex < 0 || labelIndex >= fieldLabels.length) {
                         return (
@@ -364,7 +359,7 @@ export default function HashSwiftPage() {
 
                     let decodedItemDisplay: React.ReactNode;
                     let rawDecodedValue: string = "";
-                    
+
                     if (itemIndex === 2) { // Nonce (Original index 2)
                       rawDecodedValue = decodeBase64(item, 'number');
                       decodedItemDisplay = rawDecodedValue;
@@ -379,25 +374,25 @@ export default function HashSwiftPage() {
                           if (isNaN(timestamp)) {
                             decodedItemDisplay = `Error: Decoded value for date is not a number ("${decodedNumberString}")`;
                           } else {
-                            const dateObject = new Date(timestamp * 1000); 
-                            decodedItemDisplay = dateObject.toLocaleString(); 
+                            const dateObject = new Date(timestamp * 1000);
+                            decodedItemDisplay = dateObject.toLocaleString();
                           }
                         } catch (e: any) {
                           decodedItemDisplay = `Error parsing/converting date: ${e.message}`;
                         }
                       }
-                    } else { // Other items
+                    } else {
                       rawDecodedValue = decodeBase64(item, 'string');
                       decodedItemDisplay = rawDecodedValue;
                       if ((itemIndex === 4 || itemIndex === 5) && typeof decodedItemDisplay === 'string' && decodedItemDisplay.startsWith('0x')) {
                         // itemIndex 4 = Hash du fichier, itemIndex 5 = Transaction
                         decodedItemDisplay = decodedItemDisplay.substring(2);
-                         if (itemIndex === 5) rawDecodedValue = decodedItemDisplay; // Store the 0x-stripped value for link
+                         if (itemIndex === 5) rawDecodedValue = decodedItemDisplay;
                       }
                     }
 
-                    if (itemIndex === 5 && typeof rawDecodedValue === 'string' && rawDecodedValue && !rawDecodedValue.startsWith("Error:")) { // Transaction (Original index 5)
-                        const txHash = rawDecodedValue; // Already stripped of 0x if present
+                    if (itemIndex === 5 && typeof rawDecodedValue === 'string' && rawDecodedValue && !rawDecodedValue.startsWith("Error:")) {
+                        const txHash = rawDecodedValue;
                         decodedItemDisplay = (
                           <a
                             href={`https://devnet-explorer.multiversx.com/transactions/${txHash}`}
@@ -411,9 +406,9 @@ export default function HashSwiftPage() {
                     }
 
                     return (
-                      <div 
-                        key={`item-${groupIndex}-${itemIndex}`} 
-                        className="p-2 font-mono text-xs break-all" 
+                      <div
+                        key={`item-${groupIndex}-${itemIndex}`}
+                        className="p-2 font-mono text-xs break-all"
                       >
                         <span className="font-semibold">{label}: </span>
                         {decodedItemDisplay}
@@ -456,12 +451,12 @@ export default function HashSwiftPage() {
             <div
               className={cn(
                 "flex flex-col items-center justify-center w-full p-6 border-2 border-dashed rounded-lg cursor-pointer bg-card hover:bg-muted transition-colors",
-                isHashLoading 
+                isHashLoading
                   ? "opacity-60 cursor-not-allowed"
-                  : isDraggingOver 
-                    ? "border-accent ring-2 ring-offset-2 ring-accent shadow-lg" 
-                    : hashError 
-                      ? "border-destructive" 
+                  : isDraggingOver
+                    ? "border-accent ring-2 ring-offset-2 ring-accent shadow-lg"
+                    : hashError
+                      ? "border-destructive"
                       : "border-border hover:border-accent focus-within:border-accent"
               )}
               onClick={() => !isHashLoading && document.getElementById('file-upload')?.click()}
@@ -496,7 +491,7 @@ export default function HashSwiftPage() {
             )}
           </div>
 
-          {isHashLoading && !vmQueryError && ( // Only show hash loading if no vm query error from auto-submit
+          {isHashLoading && !vmQueryError && (
             <div className="flex items-center justify-center space-x-2 text-accent p-4 rounded-md bg-accent/10">
               <Loader2 className="h-6 w-6 animate-spin" />
               <span className="text-base font-medium">Calculating hash...</span>
@@ -540,7 +535,6 @@ export default function HashSwiftPage() {
         </CardContent>
       </Card>
 
-      {/* VM Query Executor Card */}
       <Card className="w-full max-w-4xl shadow-2xl rounded-xl mt-8">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-center mb-2">
@@ -554,75 +548,95 @@ export default function HashSwiftPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="sc-address" className="text-base font-medium">SC Address</Label>
-              <Input
-                id="sc-address"
-                value={scAddressInput}
-                onChange={(e) => setScAddressInput(e.target.value)}
-                disabled={isVmQueryLoading}
-                className="p-3 h-11"
-                placeholder="erd1..."
-              />
+          <div className="border rounded-lg shadow-sm">
+            <div
+              className="flex items-center justify-between p-3 cursor-pointer bg-muted/30 hover:bg-muted/50 rounded-t-lg"
+              onClick={() => setIsQueryParametersOpen(!isQueryParametersOpen)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setIsQueryParametersOpen(!isQueryParametersOpen); }}
+              aria-expanded={isQueryParametersOpen}
+              aria-controls="query-parameters-content"
+            >
+              <h3 className="text-lg font-semibold text-primary">Query parameters</h3>
+              {isQueryParametersOpen ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="func-name" className="text-base font-medium">Function Name</Label>
-              <Input
-                id="func-name"
-                value={funcNameInput}
-                onChange={(e) => setFuncNameInput(e.target.value)}
-                disabled={isVmQueryLoading}
-                className="p-3 h-11"
-                placeholder="e.g., getSum"
-              />
-            </div>
-          </div>
 
-          <div className="space-y-3">
-            <Label className="text-base font-medium">Arguments (hex-encoded if required by SC)</Label>
-            {argsInputs.map((arg, index) => (
-              <div key={index} className="flex items-center space-x-2">
-                <Input
-                  type="text"
-                  value={arg}
-                  onChange={(e) => handleArgInputChange(index, e.target.value)}
-                  placeholder={`Argument ${index + 1}`}
-                  disabled={isVmQueryLoading}
-                  className="flex-grow p-3 h-11"
-                  aria-label={`Argument ${index + 1}`}
-                />
+            {isQueryParametersOpen && (
+              <div id="query-parameters-content" className="p-4 space-y-6 border-t rounded-b-lg">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="sc-address" className="text-base font-medium">SC Address</Label>
+                    <Input
+                      id="sc-address"
+                      value={scAddressInput}
+                      onChange={(e) => setScAddressInput(e.target.value)}
+                      disabled={isVmQueryLoading}
+                      className="p-3 h-11"
+                      placeholder="erd1..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="func-name" className="text-base font-medium">Function Name</Label>
+                    <Input
+                      id="func-name"
+                      value={funcNameInput}
+                      onChange={(e) => setFuncNameInput(e.target.value)}
+                      disabled={isVmQueryLoading}
+                      className="p-3 h-11"
+                      placeholder="e.g., getSum"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="text-base font-medium">Arguments (hex-encoded if required by SC)</Label>
+                  {argsInputs.map((arg, index) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <Input
+                        type="text"
+                        value={arg}
+                        onChange={(e) => handleArgInputChange(index, e.target.value)}
+                        placeholder={`Argument ${index + 1}`}
+                        disabled={isVmQueryLoading}
+                        className="flex-grow p-3 h-11"
+                        aria-label={`Argument ${index + 1}`}
+                      />
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() => handleRemoveArgInput(index)}
+                        disabled={isVmQueryLoading || argsInputs.length <= 1}
+                        className="h-11 w-11 flex-shrink-0 shadow-sm hover:shadow-md"
+                        aria-label={`Remove argument ${index + 1}`}
+                      >
+                        <X className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    onClick={handleAddArgInput}
+                    disabled={isVmQueryLoading}
+                    className="mt-2 h-11 shadow-sm hover:shadow-md"
+                  >
+                    <Plus className="mr-2 h-5 w-5" /> Add Argument
+                  </Button>
+                </div>
+
                 <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => handleRemoveArgInput(index)}
-                  disabled={isVmQueryLoading || argsInputs.length <= 1} // Keep at least one argument
-                  className="h-11 w-11 flex-shrink-0 shadow-sm hover:shadow-md"
-                  aria-label={`Remove argument ${index + 1}`}
+                  onClick={() => handleVmQuerySubmit()}
+                  disabled={isVmQueryLoading}
+                  className="w-full h-12 text-base shadow-md hover:shadow-lg transition-shadow"
+                  size="lg"
                 >
-                  <X className="h-5 w-5" />
+                  {isVmQueryLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
+                  Execute VM Query
                 </Button>
               </div>
-            ))}
-            <Button
-              variant="outline"
-              onClick={handleAddArgInput}
-              disabled={isVmQueryLoading}
-              className="mt-2 h-11 shadow-sm hover:shadow-md"
-            >
-              <Plus className="mr-2 h-5 w-5" /> Add Argument
-            </Button>
+            )}
           </div>
 
-          <Button 
-            onClick={() => handleVmQuerySubmit()} // Call without args to use current state
-            disabled={isVmQueryLoading} 
-            className="w-full mt-4 h-12 text-base shadow-md hover:shadow-lg transition-shadow"
-            size="lg"
-          >
-            {isVmQueryLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Send className="mr-2 h-5 w-5" />}
-            Execute VM Query
-          </Button>
 
           {isVmQueryLoading && (
             <div className="flex items-center justify-center space-x-2 text-accent p-4 rounded-md bg-accent/10 mt-4">
@@ -644,8 +658,8 @@ export default function HashSwiftPage() {
               <Label className="text-base font-medium text-foreground">
                 Decoded ReturnData
               </Label>
-              <ScrollArea 
-                type="always" 
+              <ScrollArea
+                type="always"
                 className="h-auto max-h-[40rem] w-full rounded-md border bg-muted/50 shadow-inner p-3"
               >
                 {renderVmQueryResponse(vmQueryResponse)}
@@ -664,4 +678,3 @@ export default function HashSwiftPage() {
     </main>
   );
 }
-
